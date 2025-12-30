@@ -12,43 +12,93 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
+import { index as auditLogsIndex } from '@/routes/audit-logs';
+import { index as permissionsIndex } from '@/routes/permissions';
+import { index as plansIndex } from '@/routes/plans';
+import { index as rolesIndex } from '@/routes/roles';
+import { index as subscriptionsIndex } from '@/routes/subscriptions';
 import { index as tenantsIndex } from '@/routes/tenants';
 import { index as usersIndex } from '@/routes/users';
 import { type NavItem } from '@/types';
-import { Link } from '@inertiajs/vue3';
-import { BookOpen, Folder, LayoutGrid, School, Users } from 'lucide-vue-next';
+import { Link, usePage } from '@inertiajs/vue3';
+import { CreditCard, FileSearch, FileText, KeyRound, LayoutGrid, School, Shield, Users } from 'lucide-vue-next';
+import { computed } from 'vue';
 import AppLogo from './AppLogo.vue';
 
-const mainNavItems: NavItem[] = [
-    {
-        title: 'Dashboard',
-        href: dashboard(),
-        icon: LayoutGrid,
-    },
-    {
-        title: 'Usuários',
-        href: usersIndex(),
-        icon: Users,
-    },
-    {
-        title: 'Escolas',
-        href: tenantsIndex(),
-        icon: School,
-    },
-];
+const page = usePage();
+const isAdminGeral = computed(() => page.props.auth.user?.is_admin_geral ?? false);
 
-const footerNavItems: NavItem[] = [
-    {
-        title: 'Github Repo',
-        href: 'https://github.com/laravel/vue-starter-kit',
-        icon: Folder,
-    },
-    {
-        title: 'Documentation',
-        href: 'https://laravel.com/docs/starter-kits#vue',
-        icon: BookOpen,
-    },
-];
+const generalNavItems = computed<NavItem[]>(() => {
+    const items: NavItem[] = [
+        {
+            title: 'Dashboard',
+            href: dashboard(),
+            icon: LayoutGrid,
+        },
+    ];
+
+    if (isAdminGeral.value) {
+        items.push(
+            {
+                title: 'Escolas',
+                href: tenantsIndex(),
+                icon: School,
+            },
+            {
+                title: 'Logs do Sistema',
+                href: auditLogsIndex(),
+                icon: FileSearch,
+            }
+        );
+    }
+
+    return items;
+});
+
+const plansAndSubscriptionsNavItems = computed<NavItem[]>(() => {
+    if (!isAdminGeral.value) {
+        return [];
+    }
+
+    return [
+        {
+            title: 'Planos',
+            href: plansIndex(),
+            icon: CreditCard,
+        },
+        {
+            title: 'Assinaturas',
+            href: subscriptionsIndex(),
+            icon: FileText,
+        },
+    ];
+});
+
+const usersAndPermissionsNavItems = computed<NavItem[]>(() => {
+    if (!isAdminGeral.value) {
+        return [];
+    }
+
+    return [
+        {
+            title: 'Usuários',
+            href: usersIndex(),
+            icon: Users,
+        },
+        {
+            title: 'Roles',
+            href: rolesIndex(),
+            icon: Shield,
+        },
+        {
+            title: 'Permissões',
+            href: permissionsIndex(),
+            icon: KeyRound,
+        },
+    ];
+});
+
+const footerNavItems: NavItem[] = [];
 </script>
 
 <template>
@@ -66,7 +116,17 @@ const footerNavItems: NavItem[] = [
         </SidebarHeader>
 
         <SidebarContent>
-            <NavMain :items="mainNavItems" />
+            <NavMain label="Geral" :items="generalNavItems" />
+            <NavMain
+                v-if="plansAndSubscriptionsNavItems.length > 0"
+                label="Planos e Assinaturas"
+                :items="plansAndSubscriptionsNavItems"
+            />
+            <NavMain
+                v-if="usersAndPermissionsNavItems.length > 0"
+                label="Usuários e Permissões"
+                :items="usersAndPermissionsNavItems"
+            />
         </SidebarContent>
 
         <SidebarFooter>

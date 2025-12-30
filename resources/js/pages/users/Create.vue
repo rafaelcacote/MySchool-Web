@@ -1,15 +1,17 @@
 <script setup lang="ts">
 import UsersController from '@/actions/App/Http/Controllers/UsersController';
+import { Button } from '@/components/ui/button';
 import Heading from '@/components/Heading.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { index } from '@/routes/users';
 import type { BreadcrumbItem } from '@/types';
 import { Form, Head, Link } from '@inertiajs/vue3';
-import { ArrowLeft } from 'lucide-vue-next';
+import { ArrowLeft, Users } from 'lucide-vue-next';
 import UserForm from './Partials/UserForm.vue';
 
 interface Props {
     roles: string[];
+    tenants?: Array<{ id: string; name: string }>;
 }
 
 const props = defineProps<Props>();
@@ -36,15 +38,16 @@ const breadcrumbItems: BreadcrumbItem[] = [
                     <Heading
                         title="Novo usuário"
                         description="Cadastre um novo usuário na plataforma"
+                        :icon="Users"
                     />
                 </div>
 
                 <Button
-                    variant="outline"
+                    variant="ghost"
                     as-child
-                    class="rounded-lg"
+                    class="mt-4 rounded-lg border border-input bg-background shadow-sm transition-all hover:bg-accent hover:text-accent-foreground hover:shadow-md"
                 >
-                    <Link :href="index()" class="flex items-center gap-2">
+                    <Link :href="index()" class="flex items-center gap-2 px-4 py-2">
                         <ArrowLeft class="h-4 w-4" />
                         Voltar
                     </Link>
@@ -60,10 +63,11 @@ const breadcrumbItems: BreadcrumbItem[] = [
                 >
                     <UserForm
                         :roles="props.roles"
+                        :tenants="props.tenants"
                         submit-label="Criar usuário"
                         :processing="processing"
                         :errors="errors"
-                        :show-password-fields="true"
+                        :show-password-fields="false"
                     />
                 </Form>
             </div>

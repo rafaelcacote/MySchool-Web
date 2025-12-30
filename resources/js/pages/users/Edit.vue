@@ -1,16 +1,18 @@
 <script setup lang="ts">
 import UsersController from '@/actions/App/Http/Controllers/UsersController';
+import { Button } from '@/components/ui/button';
 import Heading from '@/components/Heading.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { edit as usersEdit, index } from '@/routes/users';
 import type { BreadcrumbItem, User } from '@/types';
 import { Form, Head, Link } from '@inertiajs/vue3';
-import { ArrowLeft } from 'lucide-vue-next';
+import { ArrowLeft, Users } from 'lucide-vue-next';
 import UserForm from './Partials/UserForm.vue';
 
 interface Props {
     user: User;
     roles: string[];
+    tenants?: Array<{ id: string; name: string }>;
 }
 
 const props = defineProps<Props>();
@@ -29,23 +31,24 @@ const breadcrumbItems: BreadcrumbItem[] = [
 
 <template>
     <AppLayout :breadcrumbs="breadcrumbItems">
-        <Head :title="`Editar usuário: ${props.user.full_name}`" />
+        <Head :title="`Editar usuário: ${(props.user as any).nome_completo || props.user.name}`" />
 
         <div class="space-y-6">
             <div class="flex items-start justify-between gap-4">
                 <div class="mt-2">
                     <Heading
-                        :title="props.user.full_name"
+                        :title="(props.user as any).nome_completo || props.user.name"
                         description="Atualize os dados do usuário"
+                        :icon="Users"
                     />
                 </div>
 
                 <Button
-                    variant="outline"
+                    variant="ghost"
                     as-child
-                    class="rounded-lg"
+                    class="mt-4 rounded-lg border border-input bg-background shadow-sm transition-all hover:bg-accent hover:text-accent-foreground hover:shadow-md"
                 >
-                    <Link :href="index()" class="flex items-center gap-2">
+                    <Link :href="index()" class="flex items-center gap-2 px-4 py-2">
                         <ArrowLeft class="h-4 w-4" />
                         Voltar
                     </Link>
@@ -60,11 +63,12 @@ const breadcrumbItems: BreadcrumbItem[] = [
                 >
                     <UserForm
                         :roles="props.roles"
+                        :tenants="props.tenants"
                         :user="props.user"
                         submit-label="Salvar alterações"
                         :processing="processing"
                         :errors="errors"
-                        :show-password-fields="true"
+                        :show-password-fields="false"
                     />
                 </Form>
 

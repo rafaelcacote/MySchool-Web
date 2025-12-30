@@ -9,6 +9,7 @@ import { computed, onMounted, ref } from 'vue';
 
 const props = defineProps<{
     roles: string[];
+    tenants?: Array<{ id: string; name: string }>;
     user?: User;
     submitLabel: string;
     processing: boolean;
@@ -38,9 +39,9 @@ function formatCPF(value: string): string {
     }
 }
 
-function handleCPFInput(value: string) {
+function handleCPFInput(value: string | number) {
     // Remove caracteres não numéricos
-    const numbers = value.replace(/\D/g, '');
+    const numbers = String(value).replace(/\D/g, '');
     
     // Limita a 11 dígitos
     const limitedNumbers = numbers.slice(0, 11);
@@ -73,9 +74,9 @@ function formatPhone(value: string): string {
     }
 }
 
-function handlePhoneInput(value: string) {
+function handlePhoneInput(value: string | number) {
     // Remove caracteres não numéricos
-    const numbers = value.replace(/\D/g, '');
+    const numbers = String(value).replace(/\D/g, '');
     
     // Limita a 11 dígitos (celular)
     const limitedNumbers = numbers.slice(0, 11);
@@ -84,15 +85,16 @@ function handlePhoneInput(value: string) {
     phoneDisplay.value = formatPhone(limitedNumbers);
     
     // Atualiza o campo hidden com o valor sem máscara
-    const hiddenInput = document.querySelector('input[name="phone"]') as HTMLInputElement;
+    const hiddenInput = document.querySelector('input[name="telefone"]') as HTMLInputElement;
     if (hiddenInput) {
         hiddenInput.value = limitedNumbers;
     }
 }
 
 onMounted(() => {
-    if (props.user?.phone) {
-        phoneDisplay.value = formatPhone(props.user.phone);
+    const userPhone = (props.user as any)?.telefone || props.user?.phone;
+    if (userPhone) {
+        phoneDisplay.value = formatPhone(userPhone);
     }
     if (props.user?.cpf) {
         cpfDisplay.value = formatCPF(props.user.cpf);
@@ -104,16 +106,16 @@ onMounted(() => {
     <div class="grid gap-6">
         <div class="grid gap-6 sm:grid-cols-2">
             <div class="grid gap-2">
-                <Label for="full_name">Nome completo</Label>
+                <Label for="nome_completo">Nome completo</Label>
                 <Input
-                    id="full_name"
-                    name="full_name"
-                    :default-value="user?.full_name ?? ''"
+                    id="nome_completo"
+                    name="nome_completo"
+                    :default-value="(user as any)?.nome_completo ?? user?.name ?? ''"
                     placeholder="Ex: Maria Silva"
                     required
                     autocomplete="name"
                 />
-                <InputError :message="errors.full_name" />
+                <InputError :message="errors.nome_completo" />
             </div>
 
             <div class="grid gap-2">
@@ -150,28 +152,51 @@ onMounted(() => {
             <InputError :message="errors.email" />
         </div>
 
-        <div class="grid gap-2">
-            <Label for="role">Perfil</Label>
-            <select
-                id="role"
-                name="role"
-                class="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                :default-value="user?.role ?? 'parent'"
-                required
-            >
-                <option v-for="r in roles" :key="r" :value="r">
-                    {{ r }}
-                </option>
-            </select>
-            <InputError :message="errors.role" />
+        <div class="grid gap-6 sm:grid-cols-2">
+            <div class="grid gap-2">
+                <Label for="role">Perfil</Label>
+                <select
+                    id="role"
+                    name="role"
+                    class="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    :default-value="user?.role ?? ''"
+                    required
+                >
+                    <option value="" disabled>Selecione um perfil</option>
+                    <option v-for="r in roles" :key="r" :value="r">
+                        {{ r }}
+                    </option>
+                </select>
+                <InputError :message="errors.role" />
+            </div>
+
+            <div class="grid gap-2">
+                <Label for="tenant_id">Escola (Tenant)</Label>
+                <select
+                    id="tenant_id"
+                    name="tenant_id"
+                    class="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    :default-value="(user as any)?.tenant_id ?? ''"
+                >
+                    <option value="">Nenhuma escola</option>
+                    <option
+                        v-for="tenant in props.tenants"
+                        :key="tenant.id"
+                        :value="tenant.id"
+                    >
+                        {{ tenant.name }}
+                    </option>
+                </select>
+                <InputError :message="errors.tenant_id" />
+            </div>
         </div>
 
         <div class="grid gap-6 sm:grid-cols-2">
             <div class="grid gap-2">
-                <Label for="phone">Telefone</Label>
+                <Label for="telefone">Telefone</Label>
                 <div class="relative">
                     <Input
-                        id="phone"
+                        id="telefone"
                         :model-value="phoneDisplay"
                         placeholder="(11) 99999-9999 ou (11) 3333-4444"
                         autocomplete="tel"
@@ -179,29 +204,29 @@ onMounted(() => {
                     />
                     <input
                         type="hidden"
-                        name="phone"
+                        name="telefone"
                         :value="phoneDisplay.replace(/\D/g, '')"
                     />
                 </div>
-                <InputError :message="errors.phone" />
+                <InputError :message="errors.telefone ?? errors.phone" />
             </div>
 
             <div class="grid gap-2">
-                <Label for="is_active">Status</Label>
+                <Label for="ativo">Status</Label>
                 <label
                     class="flex h-10 items-center gap-2 rounded-md border border-input bg-background px-3 text-sm"
                 >
                     <input
                         type="hidden"
-                        name="is_active"
-                        :value="user?.is_active === false ? '0' : '1'"
+                        name="ativo"
+                        :value="(user as any)?.ativo === false ? '0' : '1'"
                     />
                     <input
-                        id="is_active"
+                        id="ativo"
                         type="checkbox"
-                        name="_is_active_toggle"
+                        name="_ativo_toggle"
                         class="h-4 w-4 rounded border border-input"
-                        :checked="user?.is_active !== false"
+                        :checked="(user as any)?.ativo !== false"
                         @change="
                             (e) => {
                                 const checked = (e.target as HTMLInputElement)
@@ -211,20 +236,22 @@ onMounted(() => {
                                 )
                                     .closest('label')
                                     ?.querySelector(
-                                        'input[type=hidden][name=is_active]',
+                                        'input[type=hidden][name=ativo]',
                                     ) as HTMLInputElement | null;
                                 if (hidden) hidden.value = checked ? '1' : '0';
                             }
                         "
                     />
                     <span class="text-muted-foreground"
-                        >{{ user?.is_active === false ? 'Inativo' : 'Ativo' }}</span
+                        >{{ (user as any)?.ativo === false ? 'Inativo' : 'Ativo' }}</span
                     >
                 </label>
-                <InputError :message="errors.is_active" />
+                <InputError :message="errors.ativo ?? errors.is_active" />
             </div>
         </div>
 
+        <!-- Campo Avatar URL comentado - não será implementado agora -->
+        <!--
         <div class="grid gap-2">
             <Label for="avatar_url">Avatar (URL)</Label>
             <Input
@@ -236,35 +263,7 @@ onMounted(() => {
             />
             <InputError :message="errors.avatar_url" />
         </div>
-
-        <div v-if="showPasswordFields" class="grid gap-6 sm:grid-cols-2">
-            <div class="grid gap-2">
-                <Label for="password"
-                    >{{ user ? 'Nova senha' : 'Senha' }}</Label
-                >
-                <Input
-                    id="password"
-                    name="password"
-                    type="password"
-                    :required="!user"
-                    autocomplete="new-password"
-                    placeholder="••••••••"
-                />
-                <InputError :message="errors.password" />
-            </div>
-
-            <div class="grid gap-2">
-                <Label for="password_confirmation">Confirmar senha</Label>
-                <Input
-                    id="password_confirmation"
-                    name="password_confirmation"
-                    type="password"
-                    :required="!user"
-                    autocomplete="new-password"
-                    placeholder="••••••••"
-                />
-            </div>
-        </div>
+        -->
 
         <div class="flex items-center justify-end gap-2">
             <Button type="submit" :disabled="processing" class="flex items-center gap-2">

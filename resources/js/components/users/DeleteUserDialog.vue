@@ -47,7 +47,7 @@ defineProps<{
                     <DialogDescription class="leading-relaxed">
                         Você está prestes a excluir o usuário
                         <span class="font-medium text-foreground">{{
-                            user.full_name
+                            (user as any).nome_completo || user.name
                         }}</span
                         >. Essa ação não pode ser desfeita.
                     </DialogDescription>

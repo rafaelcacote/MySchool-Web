@@ -22,26 +22,28 @@ const showAvatar = computed(
 </script>
 
 <template>
-    <Avatar class="h-8 w-8 overflow-hidden rounded-lg">
-        <AvatarImage
-            v-if="showAvatar"
-            :src="user.avatar_url!"
-            :alt="user.full_name || user.name"
-        />
-        <AvatarFallback class="rounded-lg text-black dark:text-white">
-            {{ getInitials(user.full_name || user.name) }}
-        </AvatarFallback>
-    </Avatar>
+    <div class="flex items-center gap-2 min-w-0 text-sidebar-foreground">
+        <Avatar class="h-8 w-8 shrink-0 overflow-hidden rounded-lg">
+            <AvatarImage
+                v-if="showAvatar"
+                :src="user.avatar_url!"
+                :alt="user.nome_completo || user.name"
+            />
+            <AvatarFallback class="rounded-lg text-black dark:text-white">
+                {{ getInitials(user.nome_completo || user.name) }}
+            </AvatarFallback>
+        </Avatar>
 
-    <div class="grid flex-1 text-left text-sm leading-tight">
-        <span class="truncate font-medium text-sidebar-foreground">{{
-            user.full_name || user.name
-        }}</span>
-        <span
-            v-if="showEmail"
-            class="truncate text-xs text-sidebar-foreground/70"
-        >{{
-            user.email
-        }}</span>
+        <div class="grid flex-1 text-left text-sm leading-tight min-w-0">
+            <span class="truncate font-medium">{{
+                user.nome_completo || user.name
+            }}</span>
+            <span
+                v-if="showEmail"
+                class="truncate text-xs opacity-70"
+            >{{
+                user.email
+            }}</span>
+        </div>
     </div>
 </template>

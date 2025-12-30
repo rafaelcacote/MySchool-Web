@@ -2,7 +2,7 @@ import { InertiaLinkProps } from '@inertiajs/vue3';
 import type { LucideIcon } from 'lucide-vue-next';
 
 export interface Auth {
-    user: User;
+    user: User | null;
 }
 
 export interface BreadcrumbItem {
@@ -36,8 +36,11 @@ export interface User {
     name: string; // mapped from full_name
     email: string;
     full_name: string;
+    nome_completo?: string;
     cpf?: string | null;
     role: string;
+    roles?: string[];
+    is_admin_geral?: boolean;
     phone?: string | null;
     avatar_url?: string | null;
     is_active: boolean;

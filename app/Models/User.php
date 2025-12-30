@@ -8,11 +8,12 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Hash;
+use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, HasUuids, Notifiable, SoftDeletes;
+    use HasFactory, HasRoles, HasUuids, Notifiable, SoftDeletes;
 
     /**
      * The "type" of the primary key ID.
@@ -45,10 +46,9 @@ class User extends Authenticatable
         'password_hash',
         'nome_completo',
         'cpf',
-        'role',
-        'phone',
+        'telefone',
         'avatar_url',
-        'is_active',
+        'ativo',
         'last_login_at',
     ];
 
@@ -69,7 +69,7 @@ class User extends Authenticatable
     protected function casts(): array
     {
         return [
-            'is_active' => 'boolean',
+            'ativo' => 'boolean',
             'last_login_at' => 'datetime',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
@@ -153,5 +153,72 @@ class User extends Authenticatable
     public function getAuthPassword(): string
     {
         return $this->attributes['password_hash'] ?? '';
+    }
+
+    /**
+     * Get the phone attribute (maps to telefone).
+     *
+     * @return string|null
+     */
+    public function getPhoneAttribute(): ?string
+    {
+        return $this->attributes['telefone'] ?? null;
+    }
+
+    /**
+     * Set the phone attribute (maps to telefone).
+     *
+     * @param  string|null  $value
+     * @return void
+     */
+    public function setPhoneAttribute(?string $value): void
+    {
+        $this->attributes['telefone'] = $value;
+    }
+
+    /**
+     * Get the is_active attribute (maps to ativo).
+     *
+     * @return bool
+     */
+    public function getIsActiveAttribute(): bool
+    {
+        return $this->attributes['ativo'] ?? false;
+    }
+
+    /**
+     * Set the is_active attribute (maps to ativo).
+     *
+     * @param  bool  $value
+     * @return void
+     */
+    public function setIsActiveAttribute(bool $value): void
+    {
+        $this->attributes['ativo'] = $value;
+    }
+
+    /**
+     * Get the tenants that belong to the user.
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsToMany
+     */
+    public function tenants()
+    {
+        return $this->belongsToMany(
+            Tenant::class,
+            'shared.usuario_tenants',
+            'usuario_id',
+            'tenant_id'
+        )->withPivot('created_at');
+    }
+
+    /**
+     * Get the first tenant (for backward compatibility).
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsToMany
+     */
+    public function tenant()
+    {
+        return $this->tenants();
     }
 }

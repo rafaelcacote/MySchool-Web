@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\DashboardController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Laravel\Fortify\Features;
@@ -18,10 +19,15 @@ Route::get('/welcome', function () {
     ]);
 })->middleware('guest')->name('welcome');
 
-Route::get('dashboard', function () {
-    return Inertia::render('Dashboard');
-})->middleware(['auth', 'verified'])->name('dashboard');
+Route::get('dashboard', [DashboardController::class, 'index'])
+    ->middleware(['auth', 'verified'])
+    ->name('dashboard');
 
 require __DIR__.'/settings.php';
 require __DIR__.'/users.php';
 require __DIR__.'/tenants.php';
+require __DIR__.'/roles.php';
+require __DIR__.'/permissions.php';
+require __DIR__.'/plans.php';
+require __DIR__.'/subscriptions.php';
+require __DIR__.'/audit-logs.php';

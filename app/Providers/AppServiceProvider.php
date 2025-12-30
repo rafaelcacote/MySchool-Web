@@ -2,10 +2,24 @@
 
 namespace App\Providers;
 
-use Illuminate\Support\ServiceProvider;
+use App\Listeners\UpdateLastLoginAt;
+use Illuminate\Auth\Events\Login;
+use Illuminate\Foundation\Support\Providers\EventServiceProvider;
+use Illuminate\Support\Facades\Event;
 
-class AppServiceProvider extends ServiceProvider
+class AppServiceProvider extends EventServiceProvider
 {
+    /**
+     * The event listener mappings for the application.
+     *
+     * @var array<class-string, array<int, class-string>>
+     */
+    protected $listen = [
+        Login::class => [
+            UpdateLastLoginAt::class,
+        ],
+    ];
+
     /**
      * Register any application services.
      */
@@ -19,6 +33,6 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        parent::boot();
     }
 }
