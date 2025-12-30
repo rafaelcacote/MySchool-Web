@@ -107,6 +107,37 @@ class FortifyServiceProvider extends ServiceProvider
             $user = \App\Models\User::where('cpf', $cpf)->first();
 
             if ($user && \Illuminate\Support\Facades\Hash::check($request->password, $user->password_hash)) {
+                $user->load('tenants');
+                $isAdminGeral = $user->hasRole('Administrador Geral');
+                
+                // Se o usuário não é admin geral, verificar se tem tenant selecionado
+                if (!$isAdminGeral) {
+                    $tenantId = $request->input('tenant_id');
+                    
+                    // Se não tem tenant selecionado, verificar se tem apenas um tenant
+                    if (!$tenantId && $user->tenants->count() === 1) {
+                        $tenantId = $user->tenants->first()->id;
+                    }
+                    
+                    // Se ainda não tem tenant e tem múltiplos, não permitir login
+                    if (!$tenantId && $user->tenants->count() > 1) {
+                        return null;
+                    }
+                    
+                    // Se tem tenant selecionado, verificar se o usuário tem acesso
+                    if ($tenantId) {
+                        $hasAccess = $user->tenants()->where('tenants.id', $tenantId)->exists();
+                        
+                        if ($hasAccess) {
+                            // Armazenar o tenant selecionado na sessão
+                            $request->session()->put('tenant_id', $tenantId);
+                        } else {
+                            // Tenant inválido para o usuário
+                            return null;
+                        }
+                    }
+                }
+                
                 return $user;
             }
         });

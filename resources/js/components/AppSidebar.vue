@@ -21,12 +21,27 @@ import { index as tenantsIndex } from '@/routes/tenants';
 import { index as usersIndex } from '@/routes/users';
 import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/vue3';
-import { CreditCard, FileSearch, FileText, KeyRound, LayoutGrid, School, Shield, Users } from 'lucide-vue-next';
+import { CreditCard, FileSearch, FileText, GraduationCap, KeyRound, LayoutGrid, School, Shield, UserCheck, Users } from 'lucide-vue-next';
 import { computed } from 'vue';
 import AppLogo from './AppLogo.vue';
 
 const page = usePage();
 const isAdminGeral = computed(() => page.props.auth.user?.is_admin_geral ?? false);
+const isAdminEscola = computed(() => {
+    const user = page.props.auth.user;
+    if (!user) return false;
+    
+    // Verifica se o usuário tem a role "Administrador Escola"
+    const roles = (user as any).roles || [];
+    const hasAdminEscolaRole = roles.includes('Administrador Escola');
+    
+    // Verifica se o usuário tem pelo menos um tenant associado
+    const tenants = (user as any).tenants || [];
+    const hasTenants = tenants.length > 0;
+    
+    // Retorna true apenas se tiver a role E tenants associados
+    return hasAdminEscolaRole && hasTenants;
+});
 
 const generalNavItems = computed<NavItem[]>(() => {
     const items: NavItem[] = [
@@ -98,6 +113,35 @@ const usersAndPermissionsNavItems = computed<NavItem[]>(() => {
     ];
 });
 
+const schoolNavItems = computed<NavItem[]>(() => {
+    if (!isAdminEscola.value) {
+        return [];
+    }
+
+    return [
+        {
+            title: 'Perfil da Escola',
+            href: '/school/profile',
+            icon: School,
+        },
+        {
+            title: 'Alunos',
+            href: '/school/students',
+            icon: GraduationCap,
+        },
+        {
+            title: 'Responsáveis',
+            href: '/school/parents',
+            icon: Users,
+        },
+        {
+            title: 'Professores',
+            href: '/school/teachers',
+            icon: UserCheck,
+        },
+    ];
+});
+
 const footerNavItems: NavItem[] = [];
 </script>
 
@@ -117,6 +161,11 @@ const footerNavItems: NavItem[] = [];
 
         <SidebarContent>
             <NavMain label="Geral" :items="generalNavItems" />
+            <NavMain
+                v-if="schoolNavItems.length > 0"
+                label="Escola"
+                :items="schoolNavItems"
+            />
             <NavMain
                 v-if="plansAndSubscriptionsNavItems.length > 0"
                 label="Planos e Assinaturas"

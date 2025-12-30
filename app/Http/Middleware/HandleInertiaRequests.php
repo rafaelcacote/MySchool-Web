@@ -42,12 +42,16 @@ class HandleInertiaRequests extends Middleware
 
         $userData = null;
         if ($user) {
-            // Carregar roles explicitamente para evitar queries N+1
-            $user->load('roles');
+            // Carregar roles e tenants explicitamente para evitar queries N+1
+            $user->load('roles', 'tenants');
             $userData = [
                 ...$user->toArray(),
                 'roles' => $user->roles->pluck('name')->toArray(),
                 'is_admin_geral' => $user->hasRole('Administrador Geral'),
+                'tenants' => $user->tenants->map(fn ($tenant) => [
+                    'id' => $tenant->id,
+                    'name' => $tenant->nome,
+                ])->toArray(),
             ];
         }
 
@@ -57,6 +61,7 @@ class HandleInertiaRequests extends Middleware
             'quote' => ['message' => trim($message), 'author' => trim($author)],
             'auth' => [
                 'user' => $userData,
+                'tenant_id' => $request->session()->get('tenant_id'),
             ],
             'toast' => fn () => $request->session()->get('toast'),
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',

@@ -3,42 +3,42 @@ import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import type { User } from '@/types';
 import { Save } from 'lucide-vue-next';
-import { computed, onMounted, ref, watch } from 'vue';
+import { onMounted, ref } from 'vue';
+
+interface Parent {
+    id?: string;
+    nome_completo?: string;
+    cpf?: string | null;
+    data_nascimento?: string | null;
+    telefone?: string | null;
+    email?: string | null;
+    endereco?: string | null;
+    endereco_numero?: string | null;
+    endereco_complemento?: string | null;
+    endereco_bairro?: string | null;
+    endereco_cep?: string | null;
+    endereco_cidade?: string | null;
+    endereco_estado?: string | null;
+    endereco_pais?: string | null;
+    parentesco?: string | null;
+    ativo?: boolean;
+    observacoes?: string | null;
+}
 
 const props = defineProps<{
-    roles: string[];
-    tenants?: Array<{ id: string; name: string }>;
-    user?: User;
+    parent?: Parent;
     submitLabel: string;
     processing: boolean;
     errors: Record<string, string>;
-    showPasswordFields: boolean;
 }>();
 
 const phoneDisplay = ref('');
 const cpfDisplay = ref('');
-const selectedRole = ref('');
-const selectedTenantId = ref<string>('');
-
-watch(
-    () => props.user,
-    (u) => {
-        selectedRole.value = u?.role ?? '';
-        selectedTenantId.value = ((u as any)?.tenant_id ?? '') as string;
-    },
-    { immediate: true },
-);
 
 function formatCPF(value: string): string {
-    // Remove tudo que não é número
     const numbers = value.replace(/\D/g, '');
-
-    // Limita a 11 dígitos
     const limitedNumbers = numbers.slice(0, 11);
-
-    // Aplica a máscara: XXX.XXX.XXX-XX
     if (limitedNumbers.length <= 3) {
         return limitedNumbers;
     } else if (limitedNumbers.length <= 6) {
@@ -51,16 +51,9 @@ function formatCPF(value: string): string {
 }
 
 function handleCPFInput(value: string | number) {
-    // Remove caracteres não numéricos
     const numbers = String(value).replace(/\D/g, '');
-    
-    // Limita a 11 dígitos
     const limitedNumbers = numbers.slice(0, 11);
-    
-    // Aplica a máscara
     cpfDisplay.value = formatCPF(limitedNumbers);
-    
-    // Atualiza o campo hidden com o valor sem máscara
     const hiddenInput = document.querySelector('input[name="cpf"]') as HTMLInputElement;
     if (hiddenInput) {
         hiddenInput.value = limitedNumbers;
@@ -68,34 +61,22 @@ function handleCPFInput(value: string | number) {
 }
 
 function formatPhone(value: string): string {
-    // Remove tudo que não é número
     const numbers = value.replace(/\D/g, '');
-
-    // Aplica a máscara baseada no tamanho
     if (numbers.length <= 2) {
         return numbers.length > 0 ? `(${numbers}` : '';
     } else if (numbers.length <= 6) {
         return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`;
     } else if (numbers.length <= 10) {
-        // Telefone fixo: (XX) XXXX-XXXX
         return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 6)}-${numbers.slice(6)}`;
     } else {
-        // Telefone celular: (XX) XXXXX-XXXX
         return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7, 11)}`;
     }
 }
 
 function handlePhoneInput(value: string | number) {
-    // Remove caracteres não numéricos
     const numbers = String(value).replace(/\D/g, '');
-    
-    // Limita a 11 dígitos (celular)
     const limitedNumbers = numbers.slice(0, 11);
-    
-    // Aplica a máscara
     phoneDisplay.value = formatPhone(limitedNumbers);
-    
-    // Atualiza o campo hidden com o valor sem máscara
     const hiddenInput = document.querySelector('input[name="telefone"]') as HTMLInputElement;
     if (hiddenInput) {
         hiddenInput.value = limitedNumbers;
@@ -103,12 +84,11 @@ function handlePhoneInput(value: string | number) {
 }
 
 onMounted(() => {
-    const userPhone = (props.user as any)?.telefone || props.user?.phone;
-    if (userPhone) {
-        phoneDisplay.value = formatPhone(userPhone);
+    if (props.parent?.telefone) {
+        phoneDisplay.value = formatPhone(props.parent.telefone);
     }
-    if (props.user?.cpf) {
-        cpfDisplay.value = formatCPF(props.user.cpf);
+    if (props.parent?.cpf) {
+        cpfDisplay.value = formatCPF(props.parent.cpf);
     }
 });
 </script>
@@ -121,7 +101,7 @@ onMounted(() => {
                 <Input
                     id="nome_completo"
                     name="nome_completo"
-                    :default-value="(user as any)?.nome_completo ?? user?.name ?? ''"
+                    :default-value="parent?.nome_completo ?? ''"
                     placeholder="Ex: Maria Silva"
                     required
                     autocomplete="name"
@@ -149,60 +129,44 @@ onMounted(() => {
             </div>
         </div>
 
-        <div class="grid gap-2">
-            <Label for="email">E-mail</Label>
-            <Input
-                id="email"
-                name="email"
-                type="email"
-                :default-value="user?.email ?? ''"
-                placeholder="maria@exemplo.com"
-                required
-                autocomplete="username"
-            />
-            <InputError :message="errors.email" />
-        </div>
-
         <div class="grid gap-6 sm:grid-cols-2">
             <div class="grid gap-2">
-                <Label for="role">Perfil</Label>
-                <select
-                    id="role"
-                    name="role"
-                    class="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    v-model="selectedRole"
-                    required
-                >
-                    <option value="" disabled>Selecione um perfil</option>
-                    <option v-for="r in roles" :key="r" :value="r">
-                        {{ r }}
-                    </option>
-                </select>
-                <InputError :message="errors.role" />
+                <Label for="data_nascimento">Data de nascimento</Label>
+                <Input
+                    id="data_nascimento"
+                    name="data_nascimento"
+                    type="date"
+                    :default-value="parent?.data_nascimento ?? ''"
+                />
+                <InputError :message="errors.data_nascimento" />
             </div>
 
             <div class="grid gap-2">
-                <Label for="tenant_id">Escola (Tenant)</Label>
-                <select
-                    id="tenant_id"
-                    name="tenant_id"
-                    class="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    v-model="selectedTenantId"
-                >
-                    <option value="">Nenhuma escola</option>
-                    <option
-                        v-for="tenant in props.tenants"
-                        :key="tenant.id"
-                        :value="tenant.id"
-                    >
-                        {{ tenant.name }}
-                    </option>
-                </select>
-                <InputError :message="errors.tenant_id" />
+                <Label for="parentesco">Parentesco</Label>
+                <Input
+                    id="parentesco"
+                    name="parentesco"
+                    :default-value="parent?.parentesco ?? ''"
+                    placeholder="Ex: Pai, Mãe, Avô, etc."
+                />
+                <InputError :message="errors.parentesco" />
             </div>
         </div>
 
         <div class="grid gap-6 sm:grid-cols-2">
+            <div class="grid gap-2">
+                <Label for="email">E-mail</Label>
+                <Input
+                    id="email"
+                    name="email"
+                    type="email"
+                    :default-value="parent?.email ?? ''"
+                    placeholder="maria@exemplo.com"
+                    autocomplete="email"
+                />
+                <InputError :message="errors.email" />
+            </div>
+
             <div class="grid gap-2">
                 <Label for="telefone">Telefone</Label>
                 <div class="relative">
@@ -219,9 +183,11 @@ onMounted(() => {
                         :value="phoneDisplay.replace(/\D/g, '')"
                     />
                 </div>
-                <InputError :message="errors.telefone ?? errors.phone" />
+                <InputError :message="errors.telefone" />
             </div>
+        </div>
 
+        <div class="grid gap-6 sm:grid-cols-2">
             <div class="grid gap-2">
                 <Label for="ativo">Status</Label>
                 <label
@@ -230,51 +196,44 @@ onMounted(() => {
                     <input
                         type="hidden"
                         name="ativo"
-                        :value="(user as any)?.ativo === false ? '0' : '1'"
+                        :value="parent?.ativo === false ? '0' : '1'"
                     />
                     <input
                         id="ativo"
                         type="checkbox"
                         name="_ativo_toggle"
                         class="h-4 w-4 rounded border border-input"
-                        :checked="(user as any)?.ativo !== false"
+                        :checked="parent?.ativo !== false"
                         @change="
                             (e) => {
-                                const checked = (e.target as HTMLInputElement)
-                                    .checked;
-                                const hidden = (
-                                    e.currentTarget as HTMLInputElement
-                                )
+                                const checked = (e.target as HTMLInputElement).checked;
+                                const hidden = (e.currentTarget as HTMLInputElement)
                                     .closest('label')
-                                    ?.querySelector(
-                                        'input[type=hidden][name=ativo]',
-                                    ) as HTMLInputElement | null;
+                                    ?.querySelector('input[type=hidden][name=ativo]') as HTMLInputElement | null;
                                 if (hidden) hidden.value = checked ? '1' : '0';
                             }
                         "
                     />
-                    <span class="text-muted-foreground"
-                        >{{ (user as any)?.ativo === false ? 'Inativo' : 'Ativo' }}</span
-                    >
+                    <span class="text-muted-foreground">
+                        {{ parent?.ativo === false ? 'Inativo' : 'Ativo' }}
+                    </span>
                 </label>
-                <InputError :message="errors.ativo ?? errors.is_active" />
+                <InputError :message="errors.ativo" />
             </div>
         </div>
 
-        <!-- Campo Avatar URL comentado - não será implementado agora -->
-        <!--
         <div class="grid gap-2">
-            <Label for="avatar_url">Avatar (URL)</Label>
-            <Input
-                id="avatar_url"
-                name="avatar_url"
-                :default-value="user?.avatar_url ?? ''"
-                placeholder="https://..."
-                autocomplete="url"
+            <Label for="observacoes">Observações</Label>
+            <textarea
+                id="observacoes"
+                name="observacoes"
+                rows="3"
+                class="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                :default-value="parent?.observacoes ?? ''"
+                placeholder="Observações adicionais sobre o responsável..."
             />
-            <InputError :message="errors.avatar_url" />
+            <InputError :message="errors.observacoes" />
         </div>
-        -->
 
         <div class="flex items-center justify-end gap-2">
             <Button type="submit" :disabled="processing" class="flex items-center gap-2">

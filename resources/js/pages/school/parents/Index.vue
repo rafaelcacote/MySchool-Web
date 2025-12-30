@@ -1,57 +1,49 @@
 <script setup lang="ts">
 import Heading from '@/components/Heading.vue';
 import Pagination from '@/components/Pagination.vue';
-import ChangePasswordDialog from '@/components/users/ChangePasswordDialog.vue';
-import DeleteUserDialog from '@/components/users/DeleteUserDialog.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/AppLayout.vue';
-import { create, edit, index } from '@/routes/users';
-import type { BreadcrumbItem, User } from '@/types';
+import type { BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/vue3';
-import { Edit, Plus, Trash2, Users } from 'lucide-vue-next';
+import { Plus, Users } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
-
-function formatDate(dateString: string | null | undefined): string {
-    if (!dateString) return '—';
-    
-    try {
-        const date = new Date(dateString);
-        return new Intl.DateTimeFormat('pt-BR', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-        }).format(date);
-    } catch {
-        return dateString;
-    }
-}
 
 function formatPhone(phone: string | null | undefined): string {
     if (!phone) return '—';
-    
-    // Remove caracteres não numéricos
     const numbers = phone.replace(/\D/g, '');
-    
-    // Formata baseado no tamanho
     if (numbers.length === 10) {
-        // Telefone fixo: (XX) XXXX-XXXX
         return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 6)}-${numbers.slice(6)}`;
     } else if (numbers.length === 11) {
-        // Telefone celular: (XX) XXXXX-XXXX
         return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7)}`;
     }
-    
     return phone;
+}
+
+function formatCPF(cpf: string | null | undefined): string {
+    if (!cpf) return '—';
+    const numbers = cpf.replace(/\D/g, '');
+    if (numbers.length === 11) {
+        return `${numbers.slice(0, 3)}.${numbers.slice(3, 6)}.${numbers.slice(6, 9)}-${numbers.slice(9, 11)}`;
+    }
+    return cpf;
 }
 
 interface PaginationLink {
     url: string | null;
     label: string;
     active: boolean;
+}
+
+interface Parent {
+    id: string;
+    nome_completo: string;
+    cpf?: string | null;
+    email?: string | null;
+    telefone?: string | null;
+    parentesco?: string | null;
+    ativo: boolean;
 }
 
 interface Paginated<T> {
@@ -64,38 +56,34 @@ interface Paginated<T> {
 }
 
 interface Props {
-    users: Paginated<User>;
+    parents: Paginated<Parent>;
     filters: {
         search?: string | null;
-        role?: string | null;
         active?: string | null;
     };
-    roles: string[];
 }
 
 const props = defineProps<Props>();
 
 const breadcrumbItems: BreadcrumbItem[] = [
     {
-        title: 'Usuários',
-        href: index().url,
+        title: 'Responsáveis',
+        href: '/school/parents',
     },
 ];
 
 const search = ref(props.filters.search ?? '');
-const role = ref(props.filters.role ?? '');
 const active = ref(props.filters.active ?? '');
 
 const hasAnyFilter = computed(
-    () => !!search.value || !!role.value || active.value !== '',
+    () => !!search.value || active.value !== '',
 );
 
 function applyFilters() {
     router.get(
-        index().url,
+        '/school/parents',
         {
             search: search.value || undefined,
-            role: role.value || undefined,
             active: active.value || undefined,
         },
         {
@@ -108,7 +96,6 @@ function applyFilters() {
 
 function clearFilters() {
     search.value = '';
-    role.value = '';
     active.value = '';
     applyFilters();
 }
@@ -116,23 +103,23 @@ function clearFilters() {
 
 <template>
     <AppLayout :breadcrumbs="breadcrumbItems">
-        <Head title="Usuários" />
+        <Head title="Responsáveis" />
 
         <div class="space-y-6">
             <div class="flex items-start justify-between gap-4">
                 <div class="mt-2">
                     <Heading
-                        title="Usuários"
-                        description="Gerencie os usuários cadastrados"
+                        title="Responsáveis"
+                        description="Gerencie os responsáveis cadastrados"
                         :icon="Users"
                     />
                 </div>
 
                 <div class="mt-2">
                     <Button as-child>
-                        <Link :href="create()" class="flex items-center gap-2">
+                        <Link href="/school/parents/create" class="flex items-center gap-2">
                             <Plus class="h-4 w-4" />
-                            Novo usuário
+                            Novo responsável
                         </Link>
                     </Button>
                 </div>
@@ -150,17 +137,6 @@ function clearFilters() {
                                 @keyup.enter="applyFilters"
                             />
                         </div>
-
-                        <select
-                            v-model="role"
-                            class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm sm:w-48"
-                            @change="applyFilters"
-                        >
-                            <option value="">Todos perfis</option>
-                            <option v-for="r in props.roles" :key="r" :value="r">
-                                {{ r }}
-                            </option>
-                        </select>
 
                         <select
                             v-model="active"
@@ -196,87 +172,52 @@ function clearFilters() {
                         >
                             <tr>
                                 <th class="px-4 py-3">Nome</th>
+                                <th class="px-4 py-3">CPF</th>
                                 <th class="px-4 py-3">E-mail</th>
-                                <th class="px-4 py-3">Perfil</th>
-                                <th class="px-4 py-3">Escola</th>
                                 <th class="px-4 py-3">Telefone</th>
                                 <th class="px-4 py-3">Status</th>
-                                <th class="px-4 py-3">Último login</th>
-                                <th class="px-4 py-3 text-right">Ações</th>
                             </tr>
                         </thead>
 
                         <tbody>
                             <tr
-                                v-for="u in props.users.data"
-                                :key="u.id"
+                                v-for="parent in props.parents.data"
+                                :key="parent.id"
                                 class="border-b last:border-0"
                             >
                                 <td class="px-4 py-3">
                                     <div class="font-medium">
-                                        {{ (u as any).nome_completo || u.name || '—' }}
+                                        {{ parent.nome_completo }}
                                     </div>
                                     <div
-                                        v-if="u.cpf"
+                                        v-if="parent.parentesco"
                                         class="mt-0.5 text-xs text-muted-foreground"
                                     >
-                                        CPF: {{ u.cpf }}
+                                        {{ parent.parentesco }}
                                     </div>
                                 </td>
-                                <td class="px-4 py-3">{{ u.email || '—' }}</td>
                                 <td class="px-4 py-3">
-                                    <Badge 
-                                        v-if="u.role"
-                                        variant="secondary"
-                                    >
-                                        {{ u.role }}
-                                    </Badge>
-                                    <span v-else class="text-muted-foreground">—</span>
+                                    {{ formatCPF(parent.cpf) }}
                                 </td>
+                                <td class="px-4 py-3">{{ parent.email || '—' }}</td>
                                 <td class="px-4 py-3">
-                                    {{ (u as any).tenant_nome || (u as any).tenant?.nome || '—' }}
-                                </td>
-                                <td class="px-4 py-3">
-                                    {{ formatPhone((u as any).telefone || u.phone) }}
+                                    {{ formatPhone(parent.telefone) }}
                                 </td>
                                 <td class="px-4 py-3">
                                     <Badge
-                                        :variant="(u as any).ativo !== false ? 'default' : 'destructive'"
+                                        :variant="parent.ativo ? 'default' : 'destructive'"
                                     >
-                                        {{ (u as any).ativo !== false ? 'Ativo' : 'Inativo' }}
+                                        {{ parent.ativo ? 'Ativo' : 'Inativo' }}
                                     </Badge>
-                                </td>
-                                <td class="px-4 py-3">
-                                    {{ formatDate(u.last_login_at) }}
-                                </td>
-                                <td class="px-4 py-3">
-                                    <div
-                                        class="flex items-center justify-end gap-2"
-                                    >
-                                        <Button
-                                            as-child
-                                            size="sm"
-                                            variant="ghost"
-                                            class="hover:bg-transparent"
-                                        >
-                                            <Link :href="edit({ user: u.id })">
-                                                <Edit
-                                                    class="h-4 w-4 text-amber-500 dark:text-amber-400"
-                                                />
-                                            </Link>
-                                        </Button>
-                                        <ChangePasswordDialog :user="u" />
-                                        <DeleteUserDialog :user="u" />
-                                    </div>
                                 </td>
                             </tr>
 
-                            <tr v-if="props.users.data.length === 0">
+                            <tr v-if="props.parents.data.length === 0">
                                 <td
-                                    colspan="8"
+                                    colspan="5"
                                     class="px-4 py-10 text-center text-sm text-muted-foreground"
                                 >
-                                    Nenhum usuário encontrado.
+                                    Nenhum responsável encontrado.
                                 </td>
                             </tr>
                         </tbody>
@@ -287,9 +228,9 @@ function clearFilters() {
                     class="flex flex-col gap-3 border-t p-4 sm:flex-row sm:items-center sm:justify-between"
                 >
                     <p class="text-sm text-muted-foreground">
-                        Total: <span class="font-medium">{{ props.users.total }}</span>
+                        Total: <span class="font-medium">{{ props.parents.total }}</span>
                     </p>
-                    <Pagination :links="props.users.links" />
+                    <Pagination :links="props.parents.links" />
                 </div>
             </div>
         </div>

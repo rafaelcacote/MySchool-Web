@@ -62,6 +62,23 @@ class PermissionsAndRolesSeeder extends Seeder
             'logs.visualizar',
         ];
 
+        // Permissões de Escola (Administrador Escola)
+        $escolaPermissions = [
+            'escola.perfil.visualizar',
+            'escola.alunos.visualizar',
+            'escola.alunos.criar',
+            'escola.alunos.editar',
+            'escola.alunos.excluir',
+            'escola.responsaveis.visualizar',
+            'escola.responsaveis.criar',
+            'escola.responsaveis.editar',
+            'escola.responsaveis.excluir',
+            'escola.professores.visualizar',
+            'escola.professores.criar',
+            'escola.professores.editar',
+            'escola.professores.excluir',
+        ];
+
         // Todas as permissões
         $allPermissions = array_merge(
             $escolasPermissions,
@@ -70,7 +87,8 @@ class PermissionsAndRolesSeeder extends Seeder
             $permissionsPermissions,
             $assinaturasPermissions,
             $planosPermissions,
-            $logsPermissions
+            $logsPermissions,
+            $escolaPermissions
         );
 
         // Criar todas as permissões
@@ -81,6 +99,10 @@ class PermissionsAndRolesSeeder extends Seeder
         // Perfil Administrador Geral
         $role = Role::findOrCreate('Administrador Geral', $guard);
         $role->syncPermissions($allPermissions);
+
+        // Perfil Administrador Escola
+        $roleEscola = Role::findOrCreate('Administrador Escola', $guard);
+        $roleEscola->syncPermissions($escolaPermissions);
     }
 }
 

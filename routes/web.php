@@ -23,6 +23,10 @@ Route::get('dashboard', [DashboardController::class, 'index'])
     ->middleware(['auth', 'verified'])
     ->name('dashboard');
 
+// Rota pública para buscar escolas por CPF (antes do login)
+Route::get('api/auth/tenants-by-cpf', [\App\Http\Controllers\Auth\TenantController::class, 'getByCpf'])
+    ->name('api.auth.tenants-by-cpf');
+
 require __DIR__.'/settings.php';
 require __DIR__.'/users.php';
 require __DIR__.'/tenants.php';
@@ -31,3 +35,4 @@ require __DIR__.'/permissions.php';
 require __DIR__.'/plans.php';
 require __DIR__.'/subscriptions.php';
 require __DIR__.'/audit-logs.php';
+require __DIR__.'/school.php';

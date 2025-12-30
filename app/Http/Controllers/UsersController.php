@@ -21,7 +21,7 @@ class UsersController extends Controller
         $filters = $request->only(['search', 'role', 'active']);
 
         $users = User::query()
-            ->with('roles:id,name')
+            ->with('roles:id,name', 'tenants:id,nome')
             ->when($filters['search'] ?? null, function ($query, string $search) {
                 $search = trim($search);
                 // Remove formatação do CPF para busca
@@ -56,6 +56,9 @@ class UsersController extends Controller
             $user->nome_completo = $user->attributes['nome_completo'] ?? $user->full_name ?? '';
             $user->telefone = $user->attributes['telefone'] ?? $user->phone ?? null;
             $user->ativo = $user->attributes['ativo'] ?? $user->is_active ?? true;
+            // Adicionar o primeiro tenant (escola) vinculado ao usuário
+            $user->tenant = $user->tenants->first();
+            $user->tenant_nome = $user->tenants->first()?->nome ?? null;
             return $user;
         });
 
@@ -142,16 +145,19 @@ class UsersController extends Controller
         // Adiciona o primeiro role como role principal para compatibilidade
         $user->role = $user->roles->first()?->name ?? null;
         
-        // Adiciona o primeiro tenant como tenant_id para compatibilidade com o formulário
-        $user->tenant_id = $user->tenants->first()?->id ?? null;
-        
         // Garantir que os campos da tabela estejam presentes
         $user->nome_completo = $user->attributes['nome_completo'] ?? $user->full_name ?? '';
         $user->telefone = $user->attributes['telefone'] ?? $user->phone ?? null;
         $user->ativo = $user->attributes['ativo'] ?? $user->is_active ?? true;
+        
+        // Adiciona o primeiro tenant como tenant_id
+        // Usar array_merge para garantir que seja incluído na serialização
+        $userData = $user->toArray();
+        $userData['tenant_id'] = $user->tenants->first()?->id ?? null;
+        $userData['role'] = $user->role;
 
         return Inertia::render('users/Edit', [
-            'user' => $user,
+            'user' => $userData,
             'roles' => Role::query()->orderBy('name')->pluck('name')->toArray(),
             'tenants' => Tenant::query()->orderBy('nome')->get(['id', 'nome'])->map(fn ($t) => [
                 'id' => $t->id,
