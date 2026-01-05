@@ -39,7 +39,24 @@ class Responsavel extends Model
      *
      * @var string
      */
-    protected $table = 'shared.responsaveis';
+    protected $table = 'escola.responsaveis';
+
+    public function getTable(): string
+    {
+        // Em SQLite (testes), não existe schema. A migration cria a tabela como `responsaveis`.
+        if ($this->getConnection()->getDriverName() === 'sqlite') {
+            return 'responsaveis';
+        }
+
+        return parent::getTable();
+    }
+
+    protected function alunoResponsavelPivotTable(): string
+    {
+        return $this->getConnection()->getDriverName() === 'sqlite'
+            ? 'aluno_responsavel'
+            : 'escola.aluno_responsavel';
+    }
 
     /**
      * The attributes that are mass assignable.
@@ -48,22 +65,10 @@ class Responsavel extends Model
      */
     protected $fillable = [
         'tenant_id',
-        'nome_completo',
+        'usuario_id',
         'cpf',
-        'data_nascimento',
-        'telefone',
-        'email',
-        'endereco',
-        'endereco_numero',
-        'endereco_complemento',
-        'endereco_bairro',
-        'endereco_cep',
-        'endereco_cidade',
-        'endereco_estado',
-        'endereco_pais',
-        'ativo',
         'parentesco',
-        'observacoes',
+        'profissao',
     ];
 
     /**
@@ -74,8 +79,6 @@ class Responsavel extends Model
     protected function casts(): array
     {
         return [
-            'data_nascimento' => 'date',
-            'ativo' => 'boolean',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
             'deleted_at' => 'datetime',
@@ -91,12 +94,52 @@ class Responsavel extends Model
     }
 
     /**
+     * Get the user (usuário) that owns the parent.
+     */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'usuario_id');
+    }
+
+    /**
      * Get the students (alunos) for the parent.
      */
     public function students(): BelongsToMany
     {
-        return $this->belongsToMany(Student::class, 'shared.aluno_responsavel', 'responsavel_id', 'aluno_id')
-            ->withTimestamps();
+        return $this->belongsToMany(Student::class, $this->alunoResponsavelPivotTable(), 'responsavel_id', 'aluno_id')
+            ->withPivot(['tenant_id', 'principal'])
+            ->wherePivot('tenant_id', $this->tenant_id);
+    }
+
+    /**
+     * Get the nome_completo attribute from the user.
+     */
+    public function getNomeCompletoAttribute(): ?string
+    {
+        return $this->user?->nome_completo;
+    }
+
+    /**
+     * Get the email attribute from the user.
+     */
+    public function getEmailAttribute(): ?string
+    {
+        return $this->user?->email;
+    }
+
+    /**
+     * Get the telefone attribute from the user.
+     */
+    public function getTelefoneAttribute(): ?string
+    {
+        return $this->user?->telefone;
+    }
+
+    /**
+     * Get the ativo attribute from the user.
+     */
+    public function getAtivoAttribute(): bool
+    {
+        return $this->user?->ativo ?? false;
     }
 }
-

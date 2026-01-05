@@ -77,6 +77,10 @@ class PermissionsAndRolesSeeder extends Seeder
             'escola.professores.criar',
             'escola.professores.editar',
             'escola.professores.excluir',
+            'escola.turmas.visualizar',
+            'escola.turmas.criar',
+            'escola.turmas.editar',
+            'escola.turmas.excluir',
         ];
 
         // Todas as permissões
@@ -105,5 +109,3 @@ class PermissionsAndRolesSeeder extends Seeder
         $roleEscola->syncPermissions($escolaPermissions);
     }
 }
-
-

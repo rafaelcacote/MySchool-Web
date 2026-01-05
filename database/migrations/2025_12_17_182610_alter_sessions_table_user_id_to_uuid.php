@@ -12,31 +12,39 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // Usar SQL direto para evitar problemas com constraints
-        // Remover foreign key se existir
-        DB::statement("
-            DO \$\$
-            BEGIN
-                IF EXISTS (
-                    SELECT 1 FROM information_schema.table_constraints 
-                    WHERE constraint_name = 'sessions_user_id_foreign'
-                ) THEN
-                    ALTER TABLE sessions DROP CONSTRAINT sessions_user_id_foreign;
-                END IF;
-            END \$\$;
-        ");
-        
-        // Remover índice se existir
+        $driver = DB::getDriverName();
+
+        // Postgres: remover FK/índice via SQL direto (SQLite não suporta DO $$).
+        if ($driver === 'pgsql') {
+            DB::statement("
+                DO \$\$
+                BEGIN
+                    IF EXISTS (
+                        SELECT 1 FROM information_schema.table_constraints
+                        WHERE constraint_name = 'sessions_user_id_foreign'
+                    ) THEN
+                        ALTER TABLE sessions DROP CONSTRAINT sessions_user_id_foreign;
+                    END IF;
+                END \$\$;
+            ");
+
+        }
+
+        // Remover índice se existir (necessário antes de dropar a coluna no SQLite).
         DB::statement('DROP INDEX IF EXISTS sessions_user_id_index');
-        
+
         // Dropar a coluna
-        Schema::table('sessions', function (Blueprint $table) {
-            $table->dropColumn('user_id');
-        });
-        
+        if (Schema::hasColumn('sessions', 'user_id')) {
+            Schema::table('sessions', function (Blueprint $table) {
+                $table->dropColumn('user_id');
+            });
+        }
+
         // Recriar a coluna como uuid
         Schema::table('sessions', function (Blueprint $table) {
-            $table->uuid('user_id')->nullable()->index();
+            if (! Schema::hasColumn('sessions', 'user_id')) {
+                $table->uuid('user_id')->nullable()->index();
+            }
         });
     }
 
@@ -45,15 +53,21 @@ return new class extends Migration
      */
     public function down(): void
     {
+        $driver = DB::getDriverName();
+
+        if ($driver !== 'pgsql') {
+            return;
+        }
+
         Schema::table('sessions', function (Blueprint $table) {
             $table->dropIndex(['user_id']);
         });
-        
+
         // Limpar dados antes de reverter
         DB::table('sessions')->whereNotNull('user_id')->update(['user_id' => null]);
-        
+
         DB::statement('ALTER TABLE sessions ALTER COLUMN user_id TYPE bigint USING NULL');
-        
+
         Schema::table('sessions', function (Blueprint $table) {
             $table->index('user_id');
         });

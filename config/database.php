@@ -98,20 +98,34 @@ return [
             'sslmode' => 'prefer',
         ],
 
-        'shared' => [
-            'driver' => 'pgsql',
-            'url' => env('DB_URL'),
-            'host' => env('DB_HOST', '127.0.0.1'),
-            'port' => env('DB_PORT', '5432'),
-            'database' => env('DB_DATABASE', 'laravel'),
-            'username' => env('DB_USERNAME', 'root'),
-            'password' => env('DB_PASSWORD', ''),
-            'charset' => env('DB_CHARSET', 'utf8'),
-            'prefix' => '',
-            'prefix_indexes' => true,
-            'search_path' => env('DB_SCHEMA', 'shared,escola,laravel,saas'),
-            'sslmode' => 'prefer',
-        ],
+        // Conexão usada para tabelas no schema `shared` (Postgres).
+        // Em ambiente de testes (SQLite), espelhamos a conexão sqlite para permitir rodar migrations/testes.
+        'shared' => env('DB_CONNECTION', 'sqlite') === 'sqlite'
+            ? [
+                'driver' => 'sqlite',
+                'url' => env('DB_URL'),
+                'database' => env('DB_DATABASE', database_path('database.sqlite')),
+                'prefix' => '',
+                'foreign_key_constraints' => env('DB_FOREIGN_KEYS', true),
+                'busy_timeout' => null,
+                'journal_mode' => null,
+                'synchronous' => null,
+                'transaction_mode' => 'DEFERRED',
+            ]
+            : [
+                'driver' => 'pgsql',
+                'url' => env('DB_URL'),
+                'host' => env('DB_HOST', '127.0.0.1'),
+                'port' => env('DB_PORT', '5432'),
+                'database' => env('DB_DATABASE', 'laravel'),
+                'username' => env('DB_USERNAME', 'root'),
+                'password' => env('DB_PASSWORD', ''),
+                'charset' => env('DB_CHARSET', 'utf8'),
+                'prefix' => '',
+                'prefix_indexes' => true,
+                'search_path' => env('DB_SCHEMA', 'shared,escola,laravel,saas'),
+                'sslmode' => 'prefer',
+            ],
 
         'sqlsrv' => [
             'driver' => 'sqlsrv',

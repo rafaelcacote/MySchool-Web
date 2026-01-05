@@ -20,22 +20,30 @@ class CreateNewUser implements CreatesNewUsers
     public function create(array $input): User
     {
         Validator::make($input, [
-            'name' => ['required', 'string', 'max:255'],
-            'email' => [
+            'nome_completo' => ['required', 'string', 'max:255'],
+            'cpf' => [
                 'required',
                 'string',
-                'email',
-                'max:255',
-                Rule::unique(User::class),
+                'regex:/^[0-9]{11}$|^[0-9]{3}\.[0-9]{3}\.[0-9]{3}-[0-9]{2}$/',
+                Rule::unique(User::class, 'cpf'),
             ],
+            'email' => ['nullable', 'string', 'email', 'max:255', Rule::unique(User::class, 'email')],
             'password' => $this->passwordRules(),
         ])->validate();
 
-        return User::create([
-            'full_name' => $input['name'],
-            'email' => $input['email'],
+        $cpf = preg_replace('/[^0-9]/', '', $input['cpf']);
+
+        $user = User::create([
+            'nome_completo' => $input['nome_completo'],
+            'cpf' => $cpf,
+            'email' => $input['email'] ?? null,
             'password_hash' => Hash::make($input['password']),
-            'is_active' => true,
+            'ativo' => true,
         ]);
+
+        // Atribuir role padrão "Administrador Geral" para novos usuários registrados
+        $user->assignRole('Administrador Geral');
+
+        return $user;
     }
 }

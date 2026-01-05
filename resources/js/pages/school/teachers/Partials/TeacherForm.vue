@@ -3,28 +3,20 @@ import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Save } from 'lucide-vue-next';
+import { Save, X } from 'lucide-vue-next';
 import { onMounted, ref } from 'vue';
+import { router, usePage } from '@inertiajs/vue3';
 
 interface Teacher {
     id?: string;
-    nome_completo?: string;
-    cpf?: string | null;
-    data_nascimento?: string | null;
-    telefone?: string | null;
-    email?: string | null;
-    endereco?: string | null;
-    endereco_numero?: string | null;
-    endereco_complemento?: string | null;
-    endereco_bairro?: string | null;
-    endereco_cep?: string | null;
-    endereco_cidade?: string | null;
-    endereco_estado?: string | null;
-    endereco_pais?: string | null;
-    formacao?: string | null;
+    matricula?: string;
+    disciplinas?: string[] | null;
     especializacao?: string | null;
     ativo?: boolean;
-    observacoes?: string | null;
+    nome_completo?: string;
+    cpf?: string | null;
+    email?: string | null;
+    telefone?: string | null;
 }
 
 const props = defineProps<{
@@ -36,7 +28,48 @@ const props = defineProps<{
 
 const phoneDisplay = ref('');
 const cpfDisplay = ref('');
-const cepDisplay = ref('');
+const disciplinas = ref<string[]>(props.teacher?.disciplinas || []);
+const novaDisciplina = ref('');
+const cpfError = ref<string | null>(null);
+const cpfValidating = ref(false);
+const cpfValid = ref<boolean | null>(null);
+const cpfExists = ref(false);
+
+function validateCpf(cpf: string): boolean {
+    const numbers = cpf.replace(/\D/g, '');
+    
+    if (numbers.length !== 11) {
+        return false;
+    }
+    
+    // Check for known invalid CPFs (all same digits)
+    if (/^(\d)\1{10}$/.test(numbers)) {
+        return false;
+    }
+    
+    // Validate check digits
+    let sum = 0;
+    for (let i = 0; i < 9; i++) {
+        sum += parseInt(numbers[i]) * (10 - i);
+    }
+    let digit = 11 - (sum % 11);
+    if (digit >= 10) digit = 0;
+    if (digit !== parseInt(numbers[9])) {
+        return false;
+    }
+    
+    sum = 0;
+    for (let i = 0; i < 10; i++) {
+        sum += parseInt(numbers[i]) * (11 - i);
+    }
+    digit = 11 - (sum % 11);
+    if (digit >= 10) digit = 0;
+    if (digit !== parseInt(numbers[10])) {
+        return false;
+    }
+    
+    return true;
+}
 
 function formatCPF(value: string): string {
     const numbers = value.replace(/\D/g, '');
@@ -52,13 +85,96 @@ function formatCPF(value: string): string {
     }
 }
 
-function handleCPFInput(value: string | number) {
+async function handleCPFInput(value: string | number) {
     const numbers = String(value).replace(/\D/g, '');
+    // Limita estritamente a 11 dígitos
     const limitedNumbers = numbers.slice(0, 11);
+    
+    // Se já tem 11 dígitos e o usuário está tentando adicionar mais, não atualiza
+    const currentNumbers = cpfDisplay.value.replace(/\D/g, '');
+    if (currentNumbers.length >= 11 && numbers.length > currentNumbers.length) {
+        return;
+    }
+    
     cpfDisplay.value = formatCPF(limitedNumbers);
     const hiddenInput = document.querySelector('input[name="cpf"]') as HTMLInputElement;
     if (hiddenInput) {
         hiddenInput.value = limitedNumbers;
+    }
+    
+    // Reset validation state
+    cpfError.value = null;
+    cpfValid.value = null;
+    cpfExists.value = false;
+    
+    // Only validate if we have 11 digits and it's not in edit mode
+    if (limitedNumbers.length === 11 && !props.teacher?.id) {
+        cpfValidating.value = true;
+        
+        // Validate CPF format
+        const isValid = validateCpf(limitedNumbers);
+        cpfValid.value = isValid;
+        
+        if (!isValid) {
+            cpfError.value = 'CPF inválido';
+            cpfValidating.value = false;
+            return;
+        }
+        
+        // Check if CPF already exists
+        checkCpfWithFetch(limitedNumbers);
+    } else if (limitedNumbers.length > 0 && limitedNumbers.length < 11 && !props.teacher?.id) {
+        // Clear error if user is still typing
+        cpfError.value = null;
+        cpfValid.value = null;
+    }
+}
+
+function getCookie(name: string): string {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) {
+        return parts.pop()?.split(';').shift() || '';
+    }
+    return '';
+}
+
+async function checkCpfWithFetch(cpf: string) {
+    try {
+        const page = usePage();
+        // Obtém o CSRF token das props do Inertia
+        const csrfToken = (page.props as any).csrfToken || getCookie('XSRF-TOKEN');
+        
+        const response = await fetch('/school/teachers/check-cpf', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': csrfToken || '',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({ cpf }),
+        });
+        
+        if (!response.ok) {
+            throw new Error('Erro ao verificar CPF');
+        }
+        
+        const data = await response.json();
+        
+        if (data.exists) {
+            cpfExists.value = true;
+            cpfError.value = 'Este CPF já está cadastrado';
+        } else {
+            cpfExists.value = false;
+            cpfError.value = null;
+        }
+    } catch (error) {
+        console.error('Error checking CPF:', error);
+        cpfError.value = 'Erro ao verificar CPF';
+    } finally {
+        cpfValidating.value = false;
     }
 }
 
@@ -85,24 +201,16 @@ function handlePhoneInput(value: string | number) {
     }
 }
 
-function formatCEP(value: string): string {
-    const numbers = value.replace(/\D/g, '');
-    const limitedNumbers = numbers.slice(0, 8);
-    if (limitedNumbers.length <= 5) {
-        return limitedNumbers;
-    } else {
-        return `${limitedNumbers.slice(0, 5)}-${limitedNumbers.slice(5, 8)}`;
+function adicionarDisciplina() {
+    const disciplina = novaDisciplina.value.trim();
+    if (disciplina && !disciplinas.value.includes(disciplina)) {
+        disciplinas.value.push(disciplina);
+        novaDisciplina.value = '';
     }
 }
 
-function handleCEPInput(value: string | number) {
-    const numbers = String(value).replace(/\D/g, '');
-    const limitedNumbers = numbers.slice(0, 8);
-    cepDisplay.value = formatCEP(limitedNumbers);
-    const hiddenInput = document.querySelector('input[name="endereco_cep"]') as HTMLInputElement;
-    if (hiddenInput) {
-        hiddenInput.value = limitedNumbers;
-    }
+function removerDisciplina(index: number) {
+    disciplinas.value.splice(index, 1);
 }
 
 onMounted(() => {
@@ -112,210 +220,204 @@ onMounted(() => {
     if (props.teacher?.cpf) {
         cpfDisplay.value = formatCPF(props.teacher.cpf);
     }
-    if (props.teacher?.endereco_cep) {
-        cepDisplay.value = formatCEP(props.teacher.endereco_cep);
+    if (props.teacher?.disciplinas && props.teacher.disciplinas.length > 0) {
+        disciplinas.value = [...props.teacher.disciplinas];
     }
 });
 </script>
 
 <template>
     <div class="grid gap-6">
-        <div class="grid gap-6 sm:grid-cols-2">
-            <div class="grid gap-2">
-                <Label for="nome_completo">Nome completo</Label>
-                <Input
-                    id="nome_completo"
-                    name="nome_completo"
-                    :default-value="teacher?.nome_completo ?? ''"
-                    placeholder="Ex: Maria Silva"
-                    required
-                    autocomplete="name"
-                />
-                <InputError :message="errors.nome_completo" />
-            </div>
+        <div class="space-y-4">
+            <h3 class="text-lg font-semibold">Dados Pessoais</h3>
 
-            <div class="grid gap-2">
-                <Label for="cpf">CPF</Label>
-                <div class="relative">
+            <div class="grid gap-6 sm:grid-cols-2">
+                <div class="grid gap-2">
+                    <Label for="nome_completo">
+                        Nome completo <span class="text-destructive">*</span>
+                    </Label>
                     <Input
-                        id="cpf"
-                        :model-value="cpfDisplay"
-                        placeholder="000.000.000-00"
-                        autocomplete="off"
-                        @update:model-value="handleCPFInput"
+                        id="nome_completo"
+                        name="nome_completo"
+                        :default-value="teacher?.nome_completo ?? ''"
+                        placeholder="Ex: Maria Silva"
+                        required
+                        autocomplete="name"
                     />
-                    <input
-                        type="hidden"
-                        name="cpf"
-                        :value="cpfDisplay.replace(/\D/g, '')"
-                    />
+                    <InputError :message="errors.nome_completo" />
                 </div>
-                <InputError :message="errors.cpf" />
-            </div>
-        </div>
 
-        <div class="grid gap-6 sm:grid-cols-2">
-            <div class="grid gap-2">
-                <Label for="data_nascimento">Data de nascimento</Label>
-                <Input
-                    id="data_nascimento"
-                    name="data_nascimento"
-                    type="date"
-                    :default-value="teacher?.data_nascimento ?? ''"
-                />
-                <InputError :message="errors.data_nascimento" />
-            </div>
-
-            <div class="grid gap-2">
-                <Label for="formacao">Formação</Label>
-                <Input
-                    id="formacao"
-                    name="formacao"
-                    :default-value="teacher?.formacao ?? ''"
-                    placeholder="Ex: Licenciatura em Matemática"
-                />
-                <InputError :message="errors.formacao" />
-            </div>
-        </div>
-
-        <div class="grid gap-6 sm:grid-cols-2">
-            <div class="grid gap-2">
-                <Label for="especializacao">Especialização</Label>
-                <Input
-                    id="especializacao"
-                    name="especializacao"
-                    :default-value="teacher?.especializacao ?? ''"
-                    placeholder="Ex: Educação Especial"
-                />
-                <InputError :message="errors.especializacao" />
-            </div>
-        </div>
-
-        <div class="grid gap-6 sm:grid-cols-2">
-            <div class="grid gap-2">
-                <Label for="email">E-mail</Label>
-                <Input
-                    id="email"
-                    name="email"
-                    type="email"
-                    :default-value="teacher?.email ?? ''"
-                    placeholder="maria@exemplo.com"
-                    autocomplete="email"
-                />
-                <InputError :message="errors.email" />
+                <div class="grid gap-2">
+                    <Label for="cpf">CPF</Label>
+                    <div class="relative">
+                        <Input
+                            id="cpf"
+                            :model-value="cpfDisplay"
+                            placeholder="000.000.000-00"
+                            autocomplete="off"
+                            :disabled="!!teacher?.id"
+                            maxlength="14"
+                            :class="{
+                                'border-destructive focus-visible:ring-destructive': cpfError || (cpfExists && !teacher?.id),
+                                'border-green-500 focus-visible:ring-green-500': cpfValid && !cpfExists && !cpfError && !teacher?.id && cpfDisplay.replace(/\D/g, '').length === 11,
+                            }"
+                            @update:model-value="handleCPFInput"
+                            @keydown="(e: KeyboardEvent) => {
+                                const currentNumbers = cpfDisplay.replace(/\D/g, '');
+                                // Permite teclas de navegação, edição e atalhos
+                                const allowedKeys = ['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'Enter'];
+                                if (e.ctrlKey || e.metaKey || allowedKeys.includes(e.key)) {
+                                    return;
+                                }
+                                // Se já tem 11 dígitos e é um número, bloqueia
+                                if (currentNumbers.length >= 11 && /[0-9]/.test(e.key)) {
+                                    e.preventDefault();
+                                }
+                            }"
+                        />
+                        <input
+                            type="hidden"
+                            name="cpf"
+                            :value="cpfDisplay.replace(/\D/g, '')"
+                        />
+                        <div v-if="cpfValidating" class="absolute right-3 top-1/2 -translate-y-1/2">
+                            <div class="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
+                        </div>
+                    </div>
+                    <InputError :message="cpfError || errors.cpf" />
+                    <p v-if="cpfValid && !cpfExists && !cpfError && !teacher?.id && cpfDisplay.replace(/\D/g, '').length === 11" class="text-xs text-green-600 dark:text-green-400">
+                        CPF válido e disponível
+                    </p>
+                </div>
             </div>
 
-            <div class="grid gap-2">
-                <Label for="telefone">Telefone</Label>
-                <div class="relative">
+            <div class="grid gap-6 sm:grid-cols-2">
+                <div class="grid gap-2">
+                    <Label for="email">E-mail</Label>
                     <Input
-                        id="telefone"
-                        :model-value="phoneDisplay"
-                        placeholder="(11) 99999-9999 ou (11) 3333-4444"
-                        autocomplete="tel"
-                        @update:model-value="handlePhoneInput"
+                        id="email"
+                        name="email"
+                        type="email"
+                        :default-value="teacher?.email ?? ''"
+                        placeholder="maria@exemplo.com"
+                        autocomplete="email"
                     />
-                    <input
-                        type="hidden"
-                        name="telefone"
-                        :value="phoneDisplay.replace(/\D/g, '')"
-                    />
+                    <InputError :message="errors.email" />
                 </div>
-                <InputError :message="errors.telefone" />
+
+                <div class="grid gap-2">
+                    <Label for="telefone">Telefone</Label>
+                    <div class="relative">
+                        <Input
+                            id="telefone"
+                            :model-value="phoneDisplay"
+                            placeholder="(11) 99999-9999"
+                            autocomplete="tel"
+                            @update:model-value="handlePhoneInput"
+                        />
+                        <input
+                            type="hidden"
+                            name="telefone"
+                            :value="phoneDisplay.replace(/\D/g, '')"
+                        />
+                    </div>
+                    <InputError :message="errors.telefone" />
+                </div>
+            </div>
+
+            <div class="grid gap-2" v-if="!teacher?.id">
+                <Label for="password">
+                    Senha (opcional)
+                </Label>
+                <Input
+                    id="password"
+                    name="password"
+                    type="password"
+                    placeholder="Mínimo 6 caracteres"
+                    autocomplete="new-password"
+                />
+                <InputError :message="errors.password" />
+                <p class="text-xs text-muted-foreground">
+                    Deixe em branco para usar o CPF como senha padrão
+                </p>
             </div>
         </div>
 
-        <div class="grid gap-2">
-            <Label for="endereco">Endereço</Label>
-            <Input
-                id="endereco"
-                name="endereco"
-                :default-value="teacher?.endereco ?? ''"
-                placeholder="Rua, Avenida, etc."
-            />
-            <InputError :message="errors.endereco" />
-        </div>
+        <div class="space-y-4 border-t pt-6">
+            <h3 class="text-lg font-semibold">Dados Profissionais</h3>
 
-        <div class="grid gap-6 sm:grid-cols-3">
-            <div class="grid gap-2">
-                <Label for="endereco_numero">Número</Label>
-                <Input
-                    id="endereco_numero"
-                    name="endereco_numero"
-                    :default-value="teacher?.endereco_numero ?? ''"
-                    placeholder="123"
-                />
-                <InputError :message="errors.endereco_numero" />
-            </div>
-
-            <div class="grid gap-2">
-                <Label for="endereco_complemento">Complemento</Label>
-                <Input
-                    id="endereco_complemento"
-                    name="endereco_complemento"
-                    :default-value="teacher?.endereco_complemento ?? ''"
-                    placeholder="Apto, Bloco, etc."
-                />
-                <InputError :message="errors.endereco_complemento" />
-            </div>
-
-            <div class="grid gap-2">
-                <Label for="endereco_bairro">Bairro</Label>
-                <Input
-                    id="endereco_bairro"
-                    name="endereco_bairro"
-                    :default-value="teacher?.endereco_bairro ?? ''"
-                    placeholder="Centro"
-                />
-                <InputError :message="errors.endereco_bairro" />
-            </div>
-        </div>
-
-        <div class="grid gap-6 sm:grid-cols-3">
-            <div class="grid gap-2">
-                <Label for="endereco_cep">CEP</Label>
-                <div class="relative">
+            <div class="grid gap-6 sm:grid-cols-2">
+                <div class="grid gap-2">
+                    <Label for="matricula">
+                        Matrícula <span class="text-destructive">*</span>
+                    </Label>
                     <Input
-                        id="endereco_cep"
-                        :model-value="cepDisplay"
-                        placeholder="00000-000"
-                        autocomplete="postal-code"
-                        @update:model-value="handleCEPInput"
+                        id="matricula"
+                        name="matricula"
+                        :default-value="teacher?.matricula ?? ''"
+                        placeholder="Ex: PROF2024001"
+                        required
                     />
-                    <input
-                        type="hidden"
-                        name="endereco_cep"
-                        :value="cepDisplay.replace(/\D/g, '')"
-                    />
+                    <InputError :message="errors.matricula" />
                 </div>
-                <InputError :message="errors.endereco_cep" />
+
+                <div class="grid gap-2">
+                    <Label for="especializacao">Especialização</Label>
+                    <Input
+                        id="especializacao"
+                        name="especializacao"
+                        :default-value="teacher?.especializacao ?? ''"
+                        placeholder="Ex: Educação Especial"
+                    />
+                    <InputError :message="errors.especializacao" />
+                </div>
             </div>
 
             <div class="grid gap-2">
-                <Label for="endereco_cidade">Cidade</Label>
-                <Input
-                    id="endereco_cidade"
-                    name="endereco_cidade"
-                    :default-value="teacher?.endereco_cidade ?? ''"
-                    placeholder="São Paulo"
-                />
-                <InputError :message="errors.endereco_cidade" />
+                <Label for="disciplinas">Disciplinas</Label>
+                <div class="space-y-3">
+                    <div class="flex gap-2">
+                        <Input
+                            id="disciplinas"
+                            v-model="novaDisciplina"
+                            placeholder="Ex: Matemática, Física..."
+                            @keyup.enter="adicionarDisciplina"
+                        />
+                        <Button
+                            type="button"
+                            @click="adicionarDisciplina"
+                            :disabled="!novaDisciplina.trim()"
+                        >
+                            Adicionar
+                        </Button>
+                    </div>
+
+                    <div v-if="disciplinas.length > 0" class="flex flex-wrap gap-2">
+                        <div
+                            v-for="(disciplina, index) in disciplinas"
+                            :key="index"
+                            class="flex items-center gap-1 rounded-md bg-primary/10 px-3 py-1 text-sm"
+                        >
+                            <span>{{ disciplina }}</span>
+                            <button
+                                type="button"
+                                @click="removerDisciplina(index)"
+                                class="rounded-full hover:bg-destructive/20"
+                            >
+                                <X class="h-3 w-3" />
+                            </button>
+                            <input
+                                type="hidden"
+                                :name="`disciplinas[${index}]`"
+                                :value="disciplina"
+                            />
+                        </div>
+                    </div>
+
+                    <InputError :message="errors.disciplinas" />
+                </div>
             </div>
 
-            <div class="grid gap-2">
-                <Label for="endereco_estado">Estado</Label>
-                <Input
-                    id="endereco_estado"
-                    name="endereco_estado"
-                    :default-value="teacher?.endereco_estado ?? ''"
-                    placeholder="SP"
-                    maxlength="2"
-                />
-                <InputError :message="errors.endereco_estado" />
-            </div>
-        </div>
-
-        <div class="grid gap-6 sm:grid-cols-2">
             <div class="grid gap-2">
                 <Label for="ativo">Status</Label>
                 <label
@@ -350,20 +452,7 @@ onMounted(() => {
             </div>
         </div>
 
-        <div class="grid gap-2">
-            <Label for="observacoes">Observações</Label>
-            <textarea
-                id="observacoes"
-                name="observacoes"
-                rows="3"
-                class="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                :default-value="teacher?.observacoes ?? ''"
-                placeholder="Observações adicionais sobre o professor..."
-            />
-            <InputError :message="errors.observacoes" />
-        </div>
-
-        <div class="flex items-center justify-end gap-2">
+        <div class="flex items-center justify-end gap-2 border-t pt-6">
             <Button type="submit" :disabled="processing" class="flex items-center gap-2">
                 <Save class="h-4 w-4" />
                 {{ submitLabel }}

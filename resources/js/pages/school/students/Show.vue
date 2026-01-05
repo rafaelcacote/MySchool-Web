@@ -11,19 +11,14 @@ interface Student {
     nome_completo: string;
     cpf?: string | null;
     data_nascimento?: string | null;
+    data_matricula?: string | null;
     telefone?: string | null;
     email?: string | null;
-    endereco?: string | null;
-    endereco_numero?: string | null;
-    endereco_complemento?: string | null;
-    endereco_bairro?: string | null;
-    endereco_cep?: string | null;
-    endereco_cidade?: string | null;
-    endereco_estado?: string | null;
-    endereco_pais?: string | null;
     matricula?: string | null;
+    serie?: string | null;
+    turma?: string | null;
     ativo: boolean;
-    observacoes?: string | null;
+    informacoes_medicas?: string | null;
     parents?: Array<{
         id: string;
         nome_completo: string;
@@ -55,15 +50,6 @@ function formatCPF(cpf: string | null | undefined): string {
         return `${numbers.slice(0, 3)}.${numbers.slice(3, 6)}.${numbers.slice(6, 9)}-${numbers.slice(9, 11)}`;
     }
     return cpf;
-}
-
-function formatCEP(cep: string | null | undefined): string {
-    if (!cep) return '—';
-    const numbers = cep.replace(/\D/g, '');
-    if (numbers.length === 8) {
-        return `${numbers.slice(0, 5)}-${numbers.slice(5, 8)}`;
-    }
-    return cep;
 }
 
 const breadcrumbItems: BreadcrumbItem[] = [
@@ -140,6 +126,20 @@ const breadcrumbItems: BreadcrumbItem[] = [
                                 <p class="mt-1">{{ props.student.matricula || '—' }}</p>
                             </div>
                             <div>
+                                <p class="text-sm font-medium text-muted-foreground">Série</p>
+                                <p class="mt-1">{{ props.student.serie || '—' }}</p>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-muted-foreground">Turma</p>
+                                <p class="mt-1">{{ props.student.turma || '—' }}</p>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-muted-foreground">Data da matrícula</p>
+                                <p class="mt-1">
+                                    {{ props.student.data_matricula ? new Date(props.student.data_matricula).toLocaleDateString('pt-BR') : '—' }}
+                                </p>
+                            </div>
+                            <div>
                                 <p class="text-sm font-medium text-muted-foreground">E-mail</p>
                                 <p class="mt-1">{{ props.student.email || '—' }}</p>
                             </div>
@@ -160,44 +160,6 @@ const breadcrumbItems: BreadcrumbItem[] = [
                         </div>
                     </div>
 
-                    <div v-if="props.student.endereco || props.student.endereco_numero || props.student.endereco_bairro || props.student.endereco_cidade">
-                        <h3 class="mb-4 text-lg font-semibold">Endereço</h3>
-                        <div class="grid gap-4 sm:grid-cols-2">
-                            <div v-if="props.student.endereco">
-                                <p class="text-sm font-medium text-muted-foreground">Logradouro</p>
-                                <p class="mt-1">{{ props.student.endereco }}</p>
-                            </div>
-                            <div v-if="props.student.endereco_numero">
-                                <p class="text-sm font-medium text-muted-foreground">Número</p>
-                                <p class="mt-1">{{ props.student.endereco_numero }}</p>
-                            </div>
-                            <div v-if="props.student.endereco_complemento">
-                                <p class="text-sm font-medium text-muted-foreground">Complemento</p>
-                                <p class="mt-1">{{ props.student.endereco_complemento }}</p>
-                            </div>
-                            <div v-if="props.student.endereco_bairro">
-                                <p class="text-sm font-medium text-muted-foreground">Bairro</p>
-                                <p class="mt-1">{{ props.student.endereco_bairro }}</p>
-                            </div>
-                            <div v-if="props.student.endereco_cep">
-                                <p class="text-sm font-medium text-muted-foreground">CEP</p>
-                                <p class="mt-1">{{ formatCEP(props.student.endereco_cep) }}</p>
-                            </div>
-                            <div v-if="props.student.endereco_cidade">
-                                <p class="text-sm font-medium text-muted-foreground">Cidade</p>
-                                <p class="mt-1">{{ props.student.endereco_cidade }}</p>
-                            </div>
-                            <div v-if="props.student.endereco_estado">
-                                <p class="text-sm font-medium text-muted-foreground">Estado</p>
-                                <p class="mt-1">{{ props.student.endereco_estado }}</p>
-                            </div>
-                            <div v-if="props.student.endereco_pais">
-                                <p class="text-sm font-medium text-muted-foreground">País</p>
-                                <p class="mt-1">{{ props.student.endereco_pais }}</p>
-                            </div>
-                        </div>
-                    </div>
-
                     <div v-if="props.student.parents && props.student.parents.length > 0">
                         <h3 class="mb-4 text-lg font-semibold">Responsáveis</h3>
                         <div class="space-y-2">
@@ -214,9 +176,9 @@ const breadcrumbItems: BreadcrumbItem[] = [
                         </div>
                     </div>
 
-                    <div v-if="props.student.observacoes">
-                        <h3 class="mb-4 text-lg font-semibold">Observações</h3>
-                        <p class="text-sm whitespace-pre-wrap">{{ props.student.observacoes }}</p>
+                    <div v-if="props.student.informacoes_medicas">
+                        <h3 class="mb-4 text-lg font-semibold">Informações médicas</h3>
+                        <p class="text-sm whitespace-pre-wrap">{{ props.student.informacoes_medicas }}</p>
                     </div>
                 </div>
             </div>

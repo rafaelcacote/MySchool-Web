@@ -22,6 +22,7 @@ interface Parent {
     endereco_estado?: string | null;
     endereco_pais?: string | null;
     parentesco?: string | null;
+    profissao?: string | null;
     ativo?: boolean;
     observacoes?: string | null;
 }
@@ -31,6 +32,7 @@ const props = defineProps<{
     submitLabel: string;
     processing: boolean;
     errors: Record<string, string>;
+    editMode?: boolean;
 }>();
 
 const phoneDisplay = ref('');
@@ -117,6 +119,8 @@ onMounted(() => {
                         :model-value="cpfDisplay"
                         placeholder="000.000.000-00"
                         autocomplete="off"
+                        :disabled="editMode"
+                        :class="editMode ? 'cursor-not-allowed opacity-60' : ''"
                         @update:model-value="handleCPFInput"
                     />
                     <input
@@ -126,6 +130,9 @@ onMounted(() => {
                     />
                 </div>
                 <InputError :message="errors.cpf" />
+                <p v-if="editMode" class="text-xs text-muted-foreground">
+                    O CPF não pode ser alterado após o cadastro.
+                </p>
             </div>
         </div>
 
@@ -150,6 +157,16 @@ onMounted(() => {
                     placeholder="Ex: Pai, Mãe, Avô, etc."
                 />
                 <InputError :message="errors.parentesco" />
+            </div>
+            <div class="grid gap-2">
+                <Label for="profissao">Profissão</Label>
+                <Input
+                    id="profissao"
+                    name="profissao"
+                    :default-value="parent?.profissao ?? ''"
+                    placeholder="Ex: Engenheiro, Professor, etc."
+                />
+                <InputError :message="errors.profissao" />
             </div>
         </div>
 

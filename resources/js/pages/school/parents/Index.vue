@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/vue3';
-import { Plus, Users } from 'lucide-vue-next';
+import { Edit, Eye, Plus, Users, UsersRound } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 
 function formatPhone(phone: string | null | undefined): string {
@@ -176,6 +176,7 @@ function clearFilters() {
                                 <th class="px-4 py-3">E-mail</th>
                                 <th class="px-4 py-3">Telefone</th>
                                 <th class="px-4 py-3">Status</th>
+                                <th class="px-4 py-3 text-right">Ações</th>
                             </tr>
                         </thead>
 
@@ -210,11 +211,52 @@ function clearFilters() {
                                         {{ parent.ativo ? 'Ativo' : 'Inativo' }}
                                     </Badge>
                                 </td>
+                                <td class="px-4 py-3">
+                                    <div
+                                        class="flex items-center justify-end gap-2"
+                                    >
+                                        <Button
+                                            as-child
+                                            size="sm"
+                                            variant="secondary"
+                                            class="px-3"
+                                        >
+                                            <Link :href="`/school/parents/${parent.id}`" class="flex items-center gap-1">
+                                                <UsersRound class="h-4 w-4" />
+                                                Alunos
+                                            </Link>
+                                        </Button>
+                                        <Button
+                                            as-child
+                                            size="sm"
+                                            variant="ghost"
+                                            class="hover:bg-transparent"
+                                        >
+                                            <Link :href="`/school/parents/${parent.id}`">
+                                                <Eye
+                                                    class="h-4 w-4 text-blue-500 dark:text-blue-400"
+                                                />
+                                            </Link>
+                                        </Button>
+                                        <Button
+                                            as-child
+                                            size="sm"
+                                            variant="ghost"
+                                            class="hover:bg-transparent"
+                                        >
+                                            <Link :href="`/school/parents/${parent.id}/edit`">
+                                                <Edit
+                                                    class="h-4 w-4 text-amber-500 dark:text-amber-400"
+                                                />
+                                            </Link>
+                                        </Button>
+                                    </div>
+                                </td>
                             </tr>
 
                             <tr v-if="props.parents.data.length === 0">
                                 <td
-                                    colspan="5"
+                                    colspan="6"
                                     class="px-4 py-10 text-center text-sm text-muted-foreground"
                                 >
                                     Nenhum responsável encontrado.

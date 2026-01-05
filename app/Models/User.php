@@ -30,11 +30,18 @@ class User extends Authenticatable
     public $incrementing = false;
 
     /**
+     * The connection name for the model.
+     *
+     * @var string|null
+     */
+    protected $connection = 'shared';
+
+    /**
      * The table associated with the model.
      *
      * @var string
      */
-    protected $table = 'shared.usuarios';
+    protected $table = 'usuarios';
 
     /**
      * The attributes that are mass assignable.
@@ -79,8 +86,6 @@ class User extends Authenticatable
 
     /**
      * Get the full_name attribute (maps to nome_completo).
-     *
-     * @return string
      */
     public function getFullNameAttribute(): string
     {
@@ -89,9 +94,6 @@ class User extends Authenticatable
 
     /**
      * Set the full_name attribute (maps to nome_completo).
-     *
-     * @param  string  $value
-     * @return void
      */
     public function setFullNameAttribute(string $value): void
     {
@@ -100,8 +102,6 @@ class User extends Authenticatable
 
     /**
      * Get the name attribute (maps to nome_completo).
-     *
-     * @return string
      */
     public function getNameAttribute(): string
     {
@@ -110,9 +110,6 @@ class User extends Authenticatable
 
     /**
      * Set the name attribute (maps to nome_completo).
-     *
-     * @param  string  $value
-     * @return void
      */
     public function setNameAttribute(string $value): void
     {
@@ -121,8 +118,6 @@ class User extends Authenticatable
 
     /**
      * Get the password attribute (maps to password_hash).
-     *
-     * @return string
      */
     public function getPasswordAttribute(): string
     {
@@ -131,9 +126,6 @@ class User extends Authenticatable
 
     /**
      * Set the password attribute (maps to password_hash and hashes it).
-     *
-     * @param  string  $value
-     * @return void
      */
     public function setPasswordAttribute(string $value): void
     {
@@ -147,8 +139,6 @@ class User extends Authenticatable
 
     /**
      * Get the password for authentication.
-     *
-     * @return string
      */
     public function getAuthPassword(): string
     {
@@ -157,8 +147,6 @@ class User extends Authenticatable
 
     /**
      * Get the phone attribute (maps to telefone).
-     *
-     * @return string|null
      */
     public function getPhoneAttribute(): ?string
     {
@@ -167,9 +155,6 @@ class User extends Authenticatable
 
     /**
      * Set the phone attribute (maps to telefone).
-     *
-     * @param  string|null  $value
-     * @return void
      */
     public function setPhoneAttribute(?string $value): void
     {
@@ -178,8 +163,6 @@ class User extends Authenticatable
 
     /**
      * Get the is_active attribute (maps to ativo).
-     *
-     * @return bool
      */
     public function getIsActiveAttribute(): bool
     {
@@ -188,9 +171,6 @@ class User extends Authenticatable
 
     /**
      * Set the is_active attribute (maps to ativo).
-     *
-     * @param  bool  $value
-     * @return void
      */
     public function setIsActiveAttribute(bool $value): void
     {
@@ -206,7 +186,7 @@ class User extends Authenticatable
     {
         return $this->belongsToMany(
             Tenant::class,
-            'shared.usuario_tenants',
+            'usuario_tenants',
             'usuario_id',
             'tenant_id'
         )->withPivot('created_at');

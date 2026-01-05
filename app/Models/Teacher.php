@@ -38,7 +38,17 @@ class Teacher extends Model
      *
      * @var string
      */
-    protected $table = 'shared.professores';
+    protected $table = 'escola.professores';
+
+    public function getTable(): string
+    {
+        // Em SQLite (testes), não existe schema. A migration cria a tabela como `professores`.
+        if ($this->getConnection()->getDriverName() === 'sqlite') {
+            return 'professores';
+        }
+
+        return parent::getTable();
+    }
 
     /**
      * The attributes that are mass assignable.
@@ -47,23 +57,11 @@ class Teacher extends Model
      */
     protected $fillable = [
         'tenant_id',
-        'nome_completo',
-        'cpf',
-        'data_nascimento',
-        'telefone',
-        'email',
-        'endereco',
-        'endereco_numero',
-        'endereco_complemento',
-        'endereco_bairro',
-        'endereco_cep',
-        'endereco_cidade',
-        'endereco_estado',
-        'endereco_pais',
-        'ativo',
-        'formacao',
+        'usuario_id',
+        'matricula',
+        'disciplinas',
         'especializacao',
-        'observacoes',
+        'ativo',
     ];
 
     /**
@@ -74,12 +72,51 @@ class Teacher extends Model
     protected function casts(): array
     {
         return [
-            'data_nascimento' => 'date',
             'ativo' => 'boolean',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
             'deleted_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Get the disciplinas attribute (PostgreSQL array to PHP array).
+     */
+    public function getDisciplinasAttribute(?string $value): ?array
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        // Remove chaves { } e converte para array
+        $value = trim($value, '{}');
+        if ($value === '') {
+            return [];
+        }
+
+        // Split por vírgula e remove aspas
+        return array_map(function ($item) {
+            return trim($item, '"');
+        }, explode(',', $value));
+    }
+
+    /**
+     * Set the disciplinas attribute (PHP array to PostgreSQL array).
+     */
+    public function setDisciplinasAttribute(?array $value): void
+    {
+        if ($value === null || empty($value)) {
+            $this->attributes['disciplinas'] = null;
+
+            return;
+        }
+
+        // Converte array PHP para formato PostgreSQL {val1,val2}
+        $escaped = array_map(function ($item) {
+            return '"'.str_replace('"', '\"', $item).'"';
+        }, $value);
+
+        $this->attributes['disciplinas'] = '{'.implode(',', $escaped).'}';
     }
 
     /**
@@ -89,5 +126,12 @@ class Teacher extends Model
     {
         return $this->belongsTo(Tenant::class);
     }
-}
 
+    /**
+     * Get the user associated with the teacher.
+     */
+    public function usuario(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'usuario_id');
+    }
+}

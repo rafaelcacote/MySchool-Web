@@ -11,19 +11,14 @@ interface Student {
     nome_completo?: string;
     cpf?: string | null;
     data_nascimento?: string | null;
+    data_matricula?: string | null;
     telefone?: string | null;
     email?: string | null;
-    endereco?: string | null;
-    endereco_numero?: string | null;
-    endereco_complemento?: string | null;
-    endereco_bairro?: string | null;
-    endereco_cep?: string | null;
-    endereco_cidade?: string | null;
-    endereco_estado?: string | null;
-    endereco_pais?: string | null;
     matricula?: string | null;
+    serie?: string | null;
+    turma?: string | null;
     ativo?: boolean;
-    observacoes?: string | null;
+    informacoes_medicas?: string | null;
 }
 
 const props = defineProps<{
@@ -148,8 +143,47 @@ onMounted(() => {
                     name="matricula"
                     :default-value="student?.matricula ?? ''"
                     placeholder="Ex: 2024001"
+                    required
                 />
                 <InputError :message="errors.matricula" />
+            </div>
+        </div>
+
+        <div class="grid gap-6 sm:grid-cols-2">
+            <div class="grid gap-2">
+                <Label for="serie">Série</Label>
+                <Input
+                    id="serie"
+                    name="serie"
+                    :default-value="student?.serie ?? ''"
+                    placeholder="Ex: 5º ano"
+                    required
+                />
+                <InputError :message="errors.serie" />
+            </div>
+
+            <div class="grid gap-2">
+                <Label for="turma">Turma</Label>
+                <Input
+                    id="turma"
+                    name="turma"
+                    :default-value="student?.turma ?? ''"
+                    placeholder="Ex: A"
+                />
+                <InputError :message="errors.turma" />
+            </div>
+        </div>
+
+        <div class="grid gap-6 sm:grid-cols-2">
+            <div class="grid gap-2">
+                <Label for="data_matricula">Data da matrícula</Label>
+                <Input
+                    id="data_matricula"
+                    name="data_matricula"
+                    type="date"
+                    :default-value="student?.data_matricula ?? ''"
+                />
+                <InputError :message="errors.data_matricula" />
             </div>
         </div>
 
@@ -223,16 +257,16 @@ onMounted(() => {
         </div>
 
         <div class="grid gap-2">
-            <Label for="observacoes">Observações</Label>
+            <Label for="informacoes_medicas">Informações médicas</Label>
             <textarea
-                id="observacoes"
-                name="observacoes"
+                id="informacoes_medicas"
+                name="informacoes_medicas"
                 rows="3"
                 class="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                :default-value="student?.observacoes ?? ''"
-                placeholder="Observações adicionais sobre o aluno..."
+                :default-value="student?.informacoes_medicas ?? ''"
+                placeholder="Informações médicas relevantes (alergias, restrições, etc.)"
             />
-            <InputError :message="errors.observacoes" />
+            <InputError :message="errors.informacoes_medicas" />
         </div>
 
         <div class="flex items-center justify-end gap-2">

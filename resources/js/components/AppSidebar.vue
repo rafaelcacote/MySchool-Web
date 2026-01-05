@@ -21,7 +21,7 @@ import { index as tenantsIndex } from '@/routes/tenants';
 import { index as usersIndex } from '@/routes/users';
 import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/vue3';
-import { CreditCard, FileSearch, FileText, GraduationCap, KeyRound, LayoutGrid, School, Shield, UserCheck, Users } from 'lucide-vue-next';
+import { BookOpen, CreditCard, FileSearch, FileText, GraduationCap, KeyRound, LayoutGrid, School, Shield, UserCheck, Users } from 'lucide-vue-next';
 import { computed } from 'vue';
 import AppLogo from './AppLogo.vue';
 
@@ -138,6 +138,11 @@ const schoolNavItems = computed<NavItem[]>(() => {
             title: 'Professores',
             href: '/school/teachers',
             icon: UserCheck,
+        },
+        {
+            title: 'Turmas',
+            href: '/school/classes',
+            icon: BookOpen,
         },
     ];
 });

@@ -37,7 +37,7 @@ class Tenant extends Model
      *
      * @var string
      */
-    protected $table = 'shared.tenants';
+    protected $table = 'tenants';
 
     /**
      * The attributes that are mass assignable.
@@ -96,8 +96,6 @@ class Tenant extends Model
 
     /**
      * Get the name attribute (maps to nome).
-     *
-     * @return string
      */
     public function getNameAttribute(): string
     {
@@ -106,9 +104,6 @@ class Tenant extends Model
 
     /**
      * Set the name attribute (maps to nome).
-     *
-     * @param  string  $value
-     * @return void
      */
     public function setNameAttribute(string $value): void
     {
@@ -117,8 +112,6 @@ class Tenant extends Model
 
     /**
      * Get the is_active attribute (maps to ativo).
-     *
-     * @return bool
      */
     public function getIsActiveAttribute(): bool
     {
@@ -127,9 +120,6 @@ class Tenant extends Model
 
     /**
      * Set the is_active attribute (maps to ativo).
-     *
-     * @param  bool  $value
-     * @return void
      */
     public function setIsActiveAttribute(bool $value): void
     {
@@ -138,8 +128,6 @@ class Tenant extends Model
 
     /**
      * Get the phone attribute (maps to telefone).
-     *
-     * @return string|null
      */
     public function getPhoneAttribute(): ?string
     {
@@ -148,9 +136,6 @@ class Tenant extends Model
 
     /**
      * Set the phone attribute (maps to telefone).
-     *
-     * @param  string|null  $value
-     * @return void
      */
     public function setPhoneAttribute(?string $value): void
     {
@@ -159,8 +144,6 @@ class Tenant extends Model
 
     /**
      * Get the address attribute (maps to endereco).
-     *
-     * @return string|null
      */
     public function getAddressAttribute(): ?string
     {
@@ -169,9 +152,6 @@ class Tenant extends Model
 
     /**
      * Set the address attribute (maps to endereco).
-     *
-     * @param  string|null  $value
-     * @return void
      */
     public function setAddressAttribute(?string $value): void
     {
@@ -180,8 +160,6 @@ class Tenant extends Model
 
     /**
      * Get the logo_url attribute.
-     *
-     * @return string|null
      */
     public function getLogoUrlAttribute(): ?string
     {
@@ -190,9 +168,6 @@ class Tenant extends Model
 
     /**
      * Set the logo_url attribute.
-     *
-     * @param  string|null  $value
-     * @return void
      */
     public function setLogoUrlAttribute(?string $value): void
     {
@@ -201,8 +176,6 @@ class Tenant extends Model
 
     /**
      * Get the subdomain attribute (maps to subdominio).
-     *
-     * @return string|null
      */
     public function getSubdomainAttribute(): ?string
     {
@@ -211,9 +184,6 @@ class Tenant extends Model
 
     /**
      * Set the subdomain attribute (maps to subdominio).
-     *
-     * @param  string|null  $value
-     * @return void
      */
     public function setSubdomainAttribute(?string $value): void
     {
@@ -222,8 +192,6 @@ class Tenant extends Model
 
     /**
      * Get the trial_until attribute (maps to trial_ate).
-     *
-     * @return \Illuminate\Support\Carbon|null
      */
     public function getTrialUntilAttribute(): ?\Illuminate\Support\Carbon
     {
@@ -234,11 +202,9 @@ class Tenant extends Model
      * Set the trial_until attribute (maps to trial_ate).
      *
      * @param  \DateTimeInterface|string|null  $value
-     * @return void
      */
     public function setTrialUntilAttribute($value): void
     {
         $this->attributes['trial_ate'] = $value;
     }
 }
-

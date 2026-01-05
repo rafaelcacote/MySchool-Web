@@ -12,19 +12,14 @@ interface Student {
     nome_completo: string;
     cpf?: string | null;
     data_nascimento?: string | null;
+    data_matricula?: string | null;
     telefone?: string | null;
     email?: string | null;
-    endereco?: string | null;
-    endereco_numero?: string | null;
-    endereco_complemento?: string | null;
-    endereco_bairro?: string | null;
-    endereco_cep?: string | null;
-    endereco_cidade?: string | null;
-    endereco_estado?: string | null;
-    endereco_pais?: string | null;
     matricula?: string | null;
+    serie?: string | null;
+    turma?: string | null;
     ativo: boolean;
-    observacoes?: string | null;
+    informacoes_medicas?: string | null;
 }
 
 interface Props {

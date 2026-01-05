@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/vue3';
-import { Plus, UserCheck } from 'lucide-vue-next';
+import { Edit, Eye, Plus, UserCheck } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 
 function formatPhone(phone: string | null | undefined): string {
@@ -38,12 +38,14 @@ interface PaginationLink {
 
 interface Teacher {
     id: string;
-    nome_completo: string;
+    matricula: string;
+    disciplinas?: string[] | null;
+    especializacao?: string | null;
+    ativo: boolean;
+    nome_completo?: string;
     cpf?: string | null;
     email?: string | null;
     telefone?: string | null;
-    formacao?: string | null;
-    ativo: boolean;
 }
 
 interface Paginated<T> {
@@ -133,7 +135,7 @@ function clearFilters() {
                         <div class="flex-1">
                             <Input
                                 v-model="search"
-                                placeholder="Buscar por nome, CPF, e-mail ou telefone..."
+                                placeholder="Buscar por matrícula, nome, CPF, e-mail ou telefone..."
                                 @keyup.enter="applyFilters"
                             />
                         </div>
@@ -171,11 +173,11 @@ function clearFilters() {
                             class="border-b bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500 dark:bg-neutral-900/40 dark:text-neutral-400"
                         >
                             <tr>
+                                <th class="px-4 py-3">Matrícula</th>
                                 <th class="px-4 py-3">Nome</th>
                                 <th class="px-4 py-3">CPF</th>
                                 <th class="px-4 py-3">E-mail</th>
-                                <th class="px-4 py-3">Formação</th>
-                                <th class="px-4 py-3">Telefone</th>
+                                <th class="px-4 py-3">Disciplinas</th>
                                 <th class="px-4 py-3">Status</th>
                                 <th class="px-4 py-3 text-right">Ações</th>
                             </tr>
@@ -189,16 +191,33 @@ function clearFilters() {
                             >
                                 <td class="px-4 py-3">
                                     <div class="font-medium">
-                                        {{ teacher.nome_completo }}
+                                        {{ teacher.matricula }}
                                     </div>
+                                </td>
+                                <td class="px-4 py-3">
+                                    {{ teacher.nome_completo || '—' }}
                                 </td>
                                 <td class="px-4 py-3">
                                     {{ formatCPF(teacher.cpf) }}
                                 </td>
                                 <td class="px-4 py-3">{{ teacher.email || '—' }}</td>
-                                <td class="px-4 py-3">{{ teacher.formacao || '—' }}</td>
                                 <td class="px-4 py-3">
-                                    {{ formatPhone(teacher.telefone) }}
+                                    <div v-if="teacher.disciplinas && teacher.disciplinas.length > 0" class="flex flex-wrap gap-1">
+                                        <span
+                                            v-for="(disciplina, idx) in teacher.disciplinas.slice(0, 2)"
+                                            :key="idx"
+                                            class="text-xs rounded bg-primary/10 px-2 py-0.5"
+                                        >
+                                            {{ disciplina }}
+                                        </span>
+                                        <span
+                                            v-if="teacher.disciplinas.length > 2"
+                                            class="text-xs text-muted-foreground"
+                                        >
+                                            +{{ teacher.disciplinas.length - 2 }}
+                                        </span>
+                                    </div>
+                                    <span v-else class="text-muted-foreground">—</span>
                                 </td>
                                 <td class="px-4 py-3">
                                     <Badge
@@ -218,8 +237,20 @@ function clearFilters() {
                                             class="hover:bg-transparent"
                                         >
                                             <Link :href="`/school/teachers/${teacher.id}`">
-                                                <UserCheck
+                                                <Eye
                                                     class="h-4 w-4 text-blue-500 dark:text-blue-400"
+                                                />
+                                            </Link>
+                                        </Button>
+                                        <Button
+                                            as-child
+                                            size="sm"
+                                            variant="ghost"
+                                            class="hover:bg-transparent"
+                                        >
+                                            <Link :href="`/school/teachers/${teacher.id}/edit`">
+                                                <Edit
+                                                    class="h-4 w-4 text-amber-500 dark:text-amber-400"
                                                 />
                                             </Link>
                                         </Button>

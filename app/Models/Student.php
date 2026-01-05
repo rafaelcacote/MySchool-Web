@@ -8,7 +8,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use App\Models\Responsavel;
 
 class Student extends Model
 {
@@ -40,7 +39,24 @@ class Student extends Model
      *
      * @var string
      */
-    protected $table = 'shared.alunos';
+    protected $table = 'escola.alunos';
+
+    public function getTable(): string
+    {
+        // Em SQLite (testes), não existe schema. A migration cria a tabela como `alunos`.
+        if ($this->getConnection()->getDriverName() === 'sqlite') {
+            return 'alunos';
+        }
+
+        return parent::getTable();
+    }
+
+    protected function alunoResponsavelPivotTable(): string
+    {
+        return $this->getConnection()->getDriverName() === 'sqlite'
+            ? 'aluno_responsavel'
+            : 'escola.aluno_responsavel';
+    }
 
     /**
      * The attributes that are mass assignable.
@@ -49,22 +65,14 @@ class Student extends Model
      */
     protected $fillable = [
         'tenant_id',
-        'nome_completo',
-        'cpf',
-        'data_nascimento',
-        'telefone',
-        'email',
-        'endereco',
-        'endereco_numero',
-        'endereco_complemento',
-        'endereco_bairro',
-        'endereco_cep',
-        'endereco_cidade',
-        'endereco_estado',
-        'endereco_pais',
-        'ativo',
+        'usuario_id',
         'matricula',
-        'observacoes',
+        'serie',
+        'turma',
+        'data_nascimento',
+        'data_matricula',
+        'informacoes_medicas',
+        'ativo',
     ];
 
     /**
@@ -76,6 +84,7 @@ class Student extends Model
     {
         return [
             'data_nascimento' => 'date',
+            'data_matricula' => 'date',
             'ativo' => 'boolean',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
@@ -92,12 +101,20 @@ class Student extends Model
     }
 
     /**
+     * Get the user (usuário) that owns the student.
+     */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'usuario_id');
+    }
+
+    /**
      * Get the parents (responsáveis) for the student.
      */
     public function parents(): BelongsToMany
     {
-        return $this->belongsToMany(Responsavel::class, 'shared.aluno_responsavel', 'aluno_id', 'responsavel_id')
-            ->withTimestamps();
+        return $this->belongsToMany(Responsavel::class, $this->alunoResponsavelPivotTable(), 'aluno_id', 'responsavel_id')
+            ->withPivot(['tenant_id', 'principal'])
+            ->wherePivot('tenant_id', $this->tenant_id);
     }
 }
-

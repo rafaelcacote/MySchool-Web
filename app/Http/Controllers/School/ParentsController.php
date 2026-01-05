@@ -3,9 +3,14 @@
 namespace App\Http\Controllers\School;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\School\StoreParentRequest;
+use App\Http\Requests\School\UpdateParentRequest;
 use App\Models\Responsavel;
+use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -35,29 +40,70 @@ class ParentsController extends Controller
         $filters = $request->only(['search', 'active']);
 
         $parents = Responsavel::query()
+            ->with('user')
             ->where('tenant_id', $tenant->id)
             ->when($filters['search'] ?? null, function ($query, string $search) {
                 $search = trim($search);
                 $cpfSearch = preg_replace('/[^0-9]/', '', $search);
                 $query->where(function ($q) use ($search, $cpfSearch) {
-                    $q->where('nome_completo', 'ilike', "%{$search}%")
-                        ->orWhere('email', 'ilike', "%{$search}%")
-                        ->orWhere('telefone', 'ilike', "%{$search}%")
+                    $q->whereHas('user', function ($userQuery) use ($search) {
+                        $userQuery->where('nome_completo', 'ilike', "%{$search}%")
+                            ->orWhere('email', 'ilike', "%{$search}%")
+                            ->orWhere('telefone', 'ilike', "%{$search}%")
+                            ->orWhere('cpf', 'ilike', "%{$cpfSearch}%");
+                    })
                         ->orWhere('cpf', 'ilike', "%{$cpfSearch}%");
                 });
             })
             ->when(isset($filters['active']) && $filters['active'] !== '' && $filters['active'] !== null, function ($query) use ($filters) {
                 $active = filter_var($filters['active'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
                 if ($active !== null) {
-                    $query->where('ativo', $active);
+                    $query->whereHas('user', function ($userQuery) use ($active) {
+                        $userQuery->where('ativo', $active);
+                    });
                 }
             })
-            ->orderBy('nome_completo')
-            ->paginate(10)
-            ->withQueryString();
+            ->get()
+            ->sortBy(function ($parent) {
+                return $parent->user?->nome_completo ?? '';
+            })
+            ->values();
+
+        // Paginação manual
+        $page = (int) $request->get('page', 1);
+        $perPage = 10;
+        $total = $parents->count();
+        $items = $parents->slice(($page - 1) * $perPage, $perPage)->values();
+
+        // Transformar os dados para incluir campos do user
+        $transformedItems = $items->map(function ($parent) {
+            return [
+                'id' => $parent->id,
+                'nome_completo' => $parent->user?->nome_completo ?? null,
+                'cpf' => $parent->cpf ?? $parent->user?->cpf ?? null,
+                'email' => $parent->user?->email ?? null,
+                'telefone' => $parent->user?->telefone ?? null,
+                'parentesco' => $parent->parentesco ?? null,
+                'ativo' => $parent->user?->ativo ?? false,
+            ];
+        })->toArray();
+
+        $paginated = new \Illuminate\Pagination\LengthAwarePaginator(
+            $transformedItems,
+            $total,
+            $perPage,
+            $page,
+            [
+                'path' => $request->url(),
+                'query' => $request->query(),
+            ]
+        );
+
+        // Garantir que os links sejam gerados corretamente
+        $paginated->withPath($request->url());
 
         return Inertia::render('school/parents/Index', [
-            'parents' => $parents,
+            'parents' => $paginated,
             'filters' => $filters,
         ]);
     }
@@ -73,44 +119,45 @@ class ParentsController extends Controller
     /**
      * Store a newly created parent.
      */
-    public function store(Request $request): RedirectResponse
+    public function store(StoreParentRequest $request): RedirectResponse
     {
         $tenant = $this->getTenant();
+        $validated = $request->validated();
 
-        $validated = $request->validate([
-            'nome_completo' => ['required', 'string', 'max:255'],
-            'cpf' => ['nullable', 'string', 'regex:/^[0-9]{11}$|^[0-9]{3}\.[0-9]{3}\.[0-9]{3}-[0-9]{2}$/'],
-            'data_nascimento' => ['nullable', 'date'],
-            'telefone' => ['nullable', 'string', 'max:20'],
-            'email' => ['nullable', 'string', 'email', 'max:255'],
-            'endereco' => ['nullable', 'string'],
-            'endereco_numero' => ['nullable', 'string', 'max:20'],
-            'endereco_complemento' => ['nullable', 'string', 'max:100'],
-            'endereco_bairro' => ['nullable', 'string', 'max:100'],
-            'endereco_cep' => ['nullable', 'string', 'regex:/^[0-9]{8}$|^[0-9]{5}-[0-9]{3}$/', 'max:10'],
-            'endereco_cidade' => ['nullable', 'string', 'max:100'],
-            'endereco_estado' => ['nullable', 'string', 'max:2'],
-            'endereco_pais' => ['nullable', 'string', 'max:50'],
-            'parentesco' => ['nullable', 'string', 'max:50'],
-            'ativo' => ['nullable', 'boolean'],
-            'observacoes' => ['nullable', 'string'],
-        ]);
+        DB::transaction(function () use ($tenant, $validated) {
+            // Remove CPF formatting
+            if (! empty($validated['cpf'])) {
+                $validated['cpf'] = preg_replace('/[^0-9]/', '', $validated['cpf']);
+            }
 
-        // Remove formatação do CPF
-        if (!empty($validated['cpf'])) {
-            $validated['cpf'] = preg_replace('/[^0-9]/', '', $validated['cpf']);
-        }
+            // Determine password: use provided password, or CPF, or default
+            $password = $validated['password'] ?? $validated['cpf'] ?? 'password';
 
-        // Remove formatação do CEP
-        if (!empty($validated['endereco_cep'])) {
-            $validated['endereco_cep'] = preg_replace('/[^0-9]/', '', $validated['endereco_cep']);
-        }
+            // Create the user first
+            $user = User::create([
+                'nome_completo' => $validated['nome_completo'],
+                'cpf' => $validated['cpf'] ?? null,
+                'email' => $validated['email'] ?? null,
+                'telefone' => $validated['telefone'] ?? null,
+                'password_hash' => Hash::make($password),
+                'ativo' => $validated['ativo'] ?? true,
+            ]);
 
-        $parent = Responsavel::create([
-            ...$validated,
-            'tenant_id' => $tenant->id,
-            'ativo' => $validated['ativo'] ?? true,
-        ]);
+            // Assign the "Responsável Aluno" role to the user
+            $user->assignRole('Responsável Aluno');
+
+            // Link the user to the tenant
+            $user->tenants()->syncWithoutDetaching([$tenant->id]);
+
+            // Create the parent linked to the user
+            Responsavel::create([
+                'tenant_id' => $tenant->id,
+                'usuario_id' => $user->id,
+                'parentesco' => $validated['parentesco'] ?? null,
+                'cpf' => $validated['cpf'] ?? null,
+                'profissao' => $validated['profissao'] ?? null,
+            ]);
+        });
 
         return redirect()
             ->route('school.parents.index')
@@ -120,5 +167,119 @@ class ParentsController extends Controller
                 'message' => 'O responsável foi cadastrado com sucesso.',
             ]);
     }
-}
 
+    /**
+     * Display the specified parent.
+     */
+    public function show(Responsavel $parent): Response
+    {
+        $tenant = $this->getTenant();
+
+        if ($parent->tenant_id !== $tenant->id) {
+            abort(404);
+        }
+
+        $parent->load([
+            'user:id,nome_completo,cpf,email,telefone,ativo',
+            'students.user:id,nome_completo,cpf,email,telefone',
+        ]);
+
+        return Inertia::render('school/parents/Show', [
+            'parent' => [
+                'id' => $parent->id,
+                'nome_completo' => $parent->user?->nome_completo,
+                'cpf' => $parent->cpf ?? $parent->user?->cpf ?? null,
+                'email' => $parent->user?->email,
+                'telefone' => $parent->user?->telefone,
+                'parentesco' => $parent->parentesco,
+                'profissao' => $parent->profissao,
+                'ativo' => $parent->user?->ativo ?? false,
+                'students' => $parent->students->map(function ($student) {
+                    return [
+                        'id' => $student->id,
+                        'nome_completo' => $student->user?->nome_completo ?? 'Sem nome',
+                        'cpf' => $student->user?->cpf,
+                        'email' => $student->user?->email,
+                        'telefone' => $student->user?->telefone,
+                        'matricula' => $student->matricula,
+                        'serie' => $student->serie,
+                        'turma' => $student->turma,
+                        'ativo' => (bool) $student->ativo,
+                    ];
+                })->values(),
+            ],
+        ]);
+    }
+
+    /**
+     * Show the form for editing the specified parent.
+     */
+    public function edit(Responsavel $parent): Response
+    {
+        $tenant = $this->getTenant();
+
+        if ($parent->tenant_id !== $tenant->id) {
+            abort(404);
+        }
+
+        $parent->load('user:id,nome_completo,cpf,email,telefone,ativo');
+
+        return Inertia::render('school/parents/Edit', [
+            'parent' => [
+                'id' => $parent->id,
+                'nome_completo' => $parent->user?->nome_completo,
+                'cpf' => $parent->cpf ?? $parent->user?->cpf ?? null,
+                'email' => $parent->user?->email,
+                'telefone' => $parent->user?->telefone,
+                'parentesco' => $parent->parentesco,
+                'profissao' => $parent->profissao,
+                'ativo' => $parent->user?->ativo ?? false,
+            ],
+        ]);
+    }
+
+    /**
+     * Update the specified parent.
+     */
+    public function update(UpdateParentRequest $request, Responsavel $parent): RedirectResponse
+    {
+        $tenant = $this->getTenant();
+
+        if ($parent->tenant_id !== $tenant->id) {
+            abort(404);
+        }
+
+        $validated = $request->validated();
+
+        DB::transaction(function () use ($parent, $validated) {
+            // Update the user (CPF não é atualizado no update, como solicitado)
+            $parent->user->update([
+                'nome_completo' => $validated['nome_completo'],
+                'email' => $validated['email'] ?? null,
+                'telefone' => $validated['telefone'] ?? null,
+                'ativo' => $validated['ativo'] ?? $parent->user->ativo,
+            ]);
+
+            // Update password if provided
+            if (! empty($validated['password'])) {
+                $parent->user->update([
+                    'password_hash' => Hash::make($validated['password']),
+                ]);
+            }
+
+            // Update the parent
+            $parent->update([
+                'parentesco' => $validated['parentesco'] ?? null,
+                'profissao' => $validated['profissao'] ?? null,
+            ]);
+        });
+
+        return redirect()
+            ->route('school.parents.edit', $parent)
+            ->with('toast', [
+                'type' => 'success',
+                'title' => 'Responsável atualizado',
+                'message' => 'As alterações foram salvas com sucesso.',
+            ]);
+    }
+}

@@ -1,6 +1,8 @@
 <?php
 
+use App\Http\Controllers\School\ClassesController;
 use App\Http\Controllers\School\ParentsController;
+use App\Http\Controllers\School\ParentStudentsController;
 use App\Http\Controllers\School\SchoolProfileController;
 use App\Http\Controllers\School\StudentsController;
 use App\Http\Controllers\School\TeachersController;
@@ -45,11 +47,29 @@ Route::middleware(['auth'])->prefix('school')->name('school.')->group(function (
     Route::post('parents', [ParentsController::class, 'store'])
         ->middleware('permission:escola.responsaveis.criar')
         ->name('parents.store');
+    Route::get('parents/{parent}', [ParentsController::class, 'show'])
+        ->middleware('permission:escola.responsaveis.visualizar')
+        ->name('parents.show');
+    Route::get('parents/{parent}/edit', [ParentsController::class, 'edit'])
+        ->middleware('permission:escola.responsaveis.editar')
+        ->name('parents.edit');
+    Route::patch('parents/{parent}', [ParentsController::class, 'update'])
+        ->middleware('permission:escola.responsaveis.editar')
+        ->name('parents.update');
+    Route::post('parents/{parent}/students', [ParentStudentsController::class, 'store'])
+        ->middleware('permission:escola.alunos.criar')
+        ->name('parents.students.store');
+    Route::delete('parents/{parent}/students/{student}', [ParentStudentsController::class, 'destroy'])
+        ->middleware('permission:escola.alunos.editar')
+        ->name('parents.students.destroy');
 
     // Professores
     Route::get('teachers', [TeachersController::class, 'index'])
         ->middleware('permission:escola.professores.visualizar')
         ->name('teachers.index');
+    Route::post('teachers/check-cpf', [TeachersController::class, 'checkCpf'])
+        ->middleware('permission:escola.professores.criar')
+        ->name('teachers.check-cpf');
     Route::get('teachers/create', [TeachersController::class, 'create'])
         ->middleware('permission:escola.professores.criar')
         ->name('teachers.create');
@@ -59,5 +79,36 @@ Route::middleware(['auth'])->prefix('school')->name('school.')->group(function (
     Route::get('teachers/{teacher}', [TeachersController::class, 'show'])
         ->middleware('permission:escola.professores.visualizar')
         ->name('teachers.show');
-});
+    Route::get('teachers/{teacher}/edit', [TeachersController::class, 'edit'])
+        ->middleware('permission:escola.professores.editar')
+        ->name('teachers.edit');
+    Route::patch('teachers/{teacher}', [TeachersController::class, 'update'])
+        ->middleware('permission:escola.professores.editar')
+        ->name('teachers.update');
 
+    // Turmas
+    Route::get('classes', [ClassesController::class, 'index'])
+        ->middleware('permission:escola.turmas.visualizar')
+        ->name('classes.index');
+    Route::get('classes/create', [ClassesController::class, 'create'])
+        ->middleware('permission:escola.turmas.criar')
+        ->name('classes.create');
+    Route::post('classes', [ClassesController::class, 'store'])
+        ->middleware('permission:escola.turmas.criar')
+        ->name('classes.store');
+    Route::get('classes/{class}', [ClassesController::class, 'show'])
+        ->middleware('permission:escola.turmas.visualizar')
+        ->name('classes.show');
+    Route::get('classes/{class}/edit', [ClassesController::class, 'edit'])
+        ->middleware('permission:escola.turmas.editar')
+        ->name('classes.edit');
+    Route::patch('classes/{class}/toggle-status', [ClassesController::class, 'toggleStatus'])
+        ->middleware('permission:escola.turmas.editar')
+        ->name('classes.toggle-status');
+    Route::patch('classes/{class}', [ClassesController::class, 'update'])
+        ->middleware('permission:escola.turmas.editar')
+        ->name('classes.update');
+    Route::delete('classes/{class}', [ClassesController::class, 'destroy'])
+        ->middleware('permission:escola.turmas.excluir')
+        ->name('classes.destroy');
+});

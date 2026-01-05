@@ -2,16 +2,38 @@
 
 namespace App\Http\Controllers\School;
 
+use App\Actions\School\CreateStudentAction;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\School\StoreStudentRequest;
+use App\Http\Requests\School\UpdateStudentRequest;
 use App\Models\Student;
+use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class StudentsController extends Controller
 {
+    public function __construct(protected CreateStudentAction $createStudentAction) {}
+
+    protected function alunosTable(): string
+    {
+        return DB::connection('shared')->getDriverName() === 'sqlite'
+            ? 'alunos'
+            : 'escola.alunos';
+    }
+
+    protected function usuariosTable(): string
+    {
+        return DB::connection('shared')->getDriverName() === 'sqlite'
+            ? 'usuarios'
+            : 'shared.usuarios';
+    }
+
     /**
      * Get the current user's tenant.
      */
@@ -35,26 +57,42 @@ class StudentsController extends Controller
         $tenant = $this->getTenant();
         $filters = $request->only(['search', 'active']);
 
-        $students = Student::query()
-            ->where('tenant_id', $tenant->id)
-            ->when($filters['search'] ?? null, function ($query, string $search) {
+        $connection = DB::connection('shared');
+        $driver = $connection->getDriverName();
+        $likeOperator = $driver === 'pgsql' ? 'ilike' : 'like';
+
+        $students = $connection
+            ->table($this->alunosTable().' as alunos')
+            ->join($this->usuariosTable().' as usuarios', 'usuarios.id', '=', 'alunos.usuario_id')
+            ->where('alunos.tenant_id', $tenant->id)
+            ->when($filters['search'] ?? null, function ($query, string $search) use ($likeOperator) {
                 $search = trim($search);
                 $cpfSearch = preg_replace('/[^0-9]/', '', $search);
-                $query->where(function ($q) use ($search, $cpfSearch) {
-                    $q->where('nome_completo', 'ilike', "%{$search}%")
-                        ->orWhere('email', 'ilike', "%{$search}%")
-                        ->orWhere('telefone', 'ilike', "%{$search}%")
-                        ->orWhere('matricula', 'ilike', "%{$search}%")
-                        ->orWhere('cpf', 'ilike', "%{$cpfSearch}%");
+
+                $query->where(function ($q) use ($search, $cpfSearch, $likeOperator) {
+                    $q->where('usuarios.nome_completo', $likeOperator, "%{$search}%")
+                        ->orWhere('usuarios.email', $likeOperator, "%{$search}%")
+                        ->orWhere('usuarios.telefone', $likeOperator, "%{$search}%")
+                        ->orWhere('alunos.matricula', $likeOperator, "%{$search}%")
+                        ->orWhere('usuarios.cpf', $likeOperator, "%{$cpfSearch}%");
                 });
             })
             ->when(isset($filters['active']) && $filters['active'] !== '' && $filters['active'] !== null, function ($query) use ($filters) {
                 $active = filter_var($filters['active'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
                 if ($active !== null) {
-                    $query->where('ativo', $active);
+                    $query->where('alunos.ativo', $active);
                 }
             })
-            ->orderBy('nome_completo')
+            ->orderBy('usuarios.nome_completo')
+            ->select([
+                'alunos.id',
+                'alunos.matricula',
+                'alunos.ativo',
+                'usuarios.nome_completo',
+                'usuarios.cpf',
+                'usuarios.email',
+                'usuarios.telefone',
+            ])
             ->paginate(10)
             ->withQueryString();
 
@@ -75,44 +113,14 @@ class StudentsController extends Controller
     /**
      * Store a newly created student.
      */
-    public function store(Request $request): RedirectResponse
+    public function store(StoreStudentRequest $request): RedirectResponse
     {
         $tenant = $this->getTenant();
+        $validated = $request->validated();
 
-        $validated = $request->validate([
-            'nome_completo' => ['required', 'string', 'max:255'],
-            'cpf' => ['nullable', 'string', 'regex:/^[0-9]{11}$|^[0-9]{3}\.[0-9]{3}\.[0-9]{3}-[0-9]{2}$/'],
-            'data_nascimento' => ['nullable', 'date'],
-            'telefone' => ['nullable', 'string', 'max:20'],
-            'email' => ['nullable', 'string', 'email', 'max:255'],
-            'endereco' => ['nullable', 'string'],
-            'endereco_numero' => ['nullable', 'string', 'max:20'],
-            'endereco_complemento' => ['nullable', 'string', 'max:100'],
-            'endereco_bairro' => ['nullable', 'string', 'max:100'],
-            'endereco_cep' => ['nullable', 'string', 'regex:/^[0-9]{8}$|^[0-9]{5}-[0-9]{3}$/', 'max:10'],
-            'endereco_cidade' => ['nullable', 'string', 'max:100'],
-            'endereco_estado' => ['nullable', 'string', 'max:2'],
-            'endereco_pais' => ['nullable', 'string', 'max:50'],
-            'matricula' => ['nullable', 'string', 'max:100'],
-            'ativo' => ['nullable', 'boolean'],
-            'observacoes' => ['nullable', 'string'],
-        ]);
-
-        // Remove formatação do CPF
-        if (!empty($validated['cpf'])) {
-            $validated['cpf'] = preg_replace('/[^0-9]/', '', $validated['cpf']);
-        }
-
-        // Remove formatação do CEP
-        if (!empty($validated['endereco_cep'])) {
-            $validated['endereco_cep'] = preg_replace('/[^0-9]/', '', $validated['endereco_cep']);
-        }
-
-        $student = Student::create([
-            ...$validated,
-            'tenant_id' => $tenant->id,
-            'ativo' => $validated['ativo'] ?? true,
-        ]);
+        DB::connection('shared')->transaction(function () use ($tenant, $validated) {
+            $this->createStudentAction->execute($validated, $tenant);
+        });
 
         return redirect()
             ->route('school.students.index')
@@ -134,10 +142,28 @@ class StudentsController extends Controller
             abort(404);
         }
 
-        $student->load('parents');
+        $student->load(['user', 'parents.user']);
 
         return Inertia::render('school/students/Show', [
-            'student' => $student,
+            'student' => [
+                'id' => $student->id,
+                'nome_completo' => $student->user?->nome_completo,
+                'cpf' => $student->user?->cpf,
+                'email' => $student->user?->email,
+                'telefone' => $student->user?->telefone,
+                'matricula' => $student->matricula,
+                'serie' => $student->serie,
+                'turma' => $student->turma,
+                'data_nascimento' => optional($student->data_nascimento)->toDateString(),
+                'data_matricula' => optional($student->data_matricula)->toDateString(),
+                'informacoes_medicas' => $student->informacoes_medicas,
+                'ativo' => (bool) $student->ativo,
+                'parents' => $student->parents->map(fn ($parent) => [
+                    'id' => $parent->id,
+                    'nome_completo' => $parent->user?->nome_completo,
+                    'parentesco' => $parent->parentesco,
+                ])->values(),
+            ],
         ]);
     }
 
@@ -152,17 +178,35 @@ class StudentsController extends Controller
             abort(404);
         }
 
-        $student->load('parents');
+        $student->load(['user', 'parents.user']);
 
         return Inertia::render('school/students/Edit', [
-            'student' => $student,
+            'student' => [
+                'id' => $student->id,
+                'nome_completo' => $student->user?->nome_completo,
+                'cpf' => $student->user?->cpf,
+                'email' => $student->user?->email,
+                'telefone' => $student->user?->telefone,
+                'matricula' => $student->matricula,
+                'serie' => $student->serie,
+                'turma' => $student->turma,
+                'data_nascimento' => optional($student->data_nascimento)->toDateString(),
+                'data_matricula' => optional($student->data_matricula)->toDateString(),
+                'informacoes_medicas' => $student->informacoes_medicas,
+                'ativo' => (bool) $student->ativo,
+                'parents' => $student->parents->map(fn ($parent) => [
+                    'id' => $parent->id,
+                    'nome_completo' => $parent->user?->nome_completo,
+                    'parentesco' => $parent->parentesco,
+                ])->values(),
+            ],
         ]);
     }
 
     /**
      * Update the specified student.
      */
-    public function update(Request $request, Student $student): RedirectResponse
+    public function update(UpdateStudentRequest $request, Student $student): RedirectResponse
     {
         $tenant = $this->getTenant();
 
@@ -170,36 +214,39 @@ class StudentsController extends Controller
             abort(404);
         }
 
-        $validated = $request->validate([
-            'nome_completo' => ['required', 'string', 'max:255'],
-            'cpf' => ['nullable', 'string', 'regex:/^[0-9]{11}$|^[0-9]{3}\.[0-9]{3}\.[0-9]{3}-[0-9]{2}$/'],
-            'data_nascimento' => ['nullable', 'date'],
-            'telefone' => ['nullable', 'string', 'max:20'],
-            'email' => ['nullable', 'string', 'email', 'max:255'],
-            'endereco' => ['nullable', 'string'],
-            'endereco_numero' => ['nullable', 'string', 'max:20'],
-            'endereco_complemento' => ['nullable', 'string', 'max:100'],
-            'endereco_bairro' => ['nullable', 'string', 'max:100'],
-            'endereco_cep' => ['nullable', 'string', 'regex:/^[0-9]{8}$|^[0-9]{5}-[0-9]{3}$/', 'max:10'],
-            'endereco_cidade' => ['nullable', 'string', 'max:100'],
-            'endereco_estado' => ['nullable', 'string', 'max:2'],
-            'endereco_pais' => ['nullable', 'string', 'max:50'],
-            'matricula' => ['nullable', 'string', 'max:100'],
-            'ativo' => ['nullable', 'boolean'],
-            'observacoes' => ['nullable', 'string'],
-        ]);
+        $validated = $request->validated();
 
-        // Remove formatação do CPF
-        if (!empty($validated['cpf'])) {
-            $validated['cpf'] = preg_replace('/[^0-9]/', '', $validated['cpf']);
-        }
+        DB::connection('shared')->transaction(function () use ($tenant, $student, $validated) {
+            $user = null;
 
-        // Remove formatação do CEP
-        if (!empty($validated['endereco_cep'])) {
-            $validated['endereco_cep'] = preg_replace('/[^0-9]/', '', $validated['endereco_cep']);
-        }
+            if (! empty($student->usuario_id)) {
+                $user = User::query()->find($student->usuario_id);
+            }
 
-        $student->update($validated);
+            if (! $user) {
+                $user = new User;
+                $user->password_hash = Hash::make(! empty($validated['cpf']) ? $validated['cpf'] : Str::random(32));
+            }
+
+            $user->nome_completo = $validated['nome_completo'];
+            $user->cpf = $validated['cpf'] ?? null;
+            $user->email = $validated['email'] ?? null;
+            $user->telefone = $validated['telefone'] ?? null;
+            $user->ativo = $validated['ativo'] ?? $user->ativo ?? true;
+            $user->save();
+            $user->tenants()->syncWithoutDetaching([$tenant->id]);
+
+            $student->update([
+                'usuario_id' => $user->id,
+                'matricula' => $validated['matricula'],
+                'serie' => $validated['serie'],
+                'turma' => $validated['turma'] ?? null,
+                'data_nascimento' => $validated['data_nascimento'] ?? null,
+                'data_matricula' => $validated['data_matricula'] ?? null,
+                'informacoes_medicas' => $validated['informacoes_medicas'] ?? null,
+                'ativo' => $validated['ativo'] ?? true,
+            ]);
+        });
 
         return redirect()
             ->route('school.students.edit', $student)
@@ -232,4 +279,3 @@ class StudentsController extends Controller
             ]);
     }
 }
-
