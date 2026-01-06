@@ -1,24 +1,39 @@
 <script setup lang="ts">
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import InputError from '@/components/InputError.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
-import { Head, Link } from '@inertiajs/vue3';
-import { ArrowLeft, Edit, GraduationCap, User } from 'lucide-vue-next';
+import { Form, Head, Link } from '@inertiajs/vue3';
+import { ArrowLeft, Edit, GraduationCap, RefreshCw, User } from 'lucide-vue-next';
+import { ref } from 'vue';
+
+interface Turma {
+    id: string;
+    nome: string;
+    serie?: string | null;
+    turma_letra?: string | null;
+    ano_letivo?: string | null;
+}
 
 interface Student {
     id: string;
-    nome_completo: string;
-    cpf?: string | null;
+    nome: string;
+    nome_social?: string | null;
+    foto_url?: string | null;
     data_nascimento?: string | null;
-    data_matricula?: string | null;
-    telefone?: string | null;
-    email?: string | null;
-    matricula?: string | null;
-    serie?: string | null;
-    turma?: string | null;
     ativo: boolean;
     informacoes_medicas?: string | null;
+    turma?: Turma | null;
     parents?: Array<{
         id: string;
         nome_completo: string;
@@ -28,29 +43,11 @@ interface Student {
 
 interface Props {
     student: Student;
+    turmas?: Turma[];
 }
 
 const props = defineProps<Props>();
-
-function formatPhone(phone: string | null | undefined): string {
-    if (!phone) return '—';
-    const numbers = phone.replace(/\D/g, '');
-    if (numbers.length === 10) {
-        return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 6)}-${numbers.slice(6)}`;
-    } else if (numbers.length === 11) {
-        return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7)}`;
-    }
-    return phone;
-}
-
-function formatCPF(cpf: string | null | undefined): string {
-    if (!cpf) return '—';
-    const numbers = cpf.replace(/\D/g, '');
-    if (numbers.length === 11) {
-        return `${numbers.slice(0, 3)}.${numbers.slice(3, 6)}.${numbers.slice(6, 9)}-${numbers.slice(9, 11)}`;
-    }
-    return cpf;
-}
+const reenrollDialogOpen = ref(false);
 
 const breadcrumbItems: BreadcrumbItem[] = [
     {
@@ -58,7 +55,7 @@ const breadcrumbItems: BreadcrumbItem[] = [
         href: '/school/students',
     },
     {
-        title: props.student.nome_completo,
+        title: props.student.nome,
         href: `/school/students/${props.student.id}`,
     },
 ];
@@ -66,7 +63,7 @@ const breadcrumbItems: BreadcrumbItem[] = [
 
 <template>
     <AppLayout :breadcrumbs="breadcrumbItems">
-        <Head :title="`Aluno: ${props.student.nome_completo}`" />
+        <Head :title="`Aluno: ${props.student.nome}`" />
 
         <div class="space-y-6">
             <div class="flex items-start justify-between gap-4">
@@ -74,7 +71,7 @@ const breadcrumbItems: BreadcrumbItem[] = [
                     <div class="mb-8 space-y-0.5">
                         <h2 class="flex items-center gap-2 text-xl font-semibold tracking-tight">
                             <GraduationCap class="h-5 w-5" />
-                            {{ props.student.nome_completo }}
+                            {{ props.student.nome }}
                         </h2>
                         <p class="text-sm text-muted-foreground">
                             Perfil do aluno
@@ -109,11 +106,26 @@ const breadcrumbItems: BreadcrumbItem[] = [
                         <div class="grid gap-4 sm:grid-cols-2">
                             <div>
                                 <p class="text-sm font-medium text-muted-foreground">Nome completo</p>
-                                <p class="mt-1">{{ props.student.nome_completo }}</p>
+                                <p class="mt-1">{{ props.student.nome }}</p>
                             </div>
                             <div>
-                                <p class="text-sm font-medium text-muted-foreground">CPF</p>
-                                <p class="mt-1">{{ formatCPF(props.student.cpf) }}</p>
+                                <p class="text-sm font-medium text-muted-foreground">Nome social</p>
+                                <p class="mt-1">{{ props.student.nome_social || '—' }}</p>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-muted-foreground">Turma atual</p>
+                                <p class="mt-1">
+                                    <span v-if="props.student.turma">
+                                        {{ props.student.turma.nome }}
+                                        <template v-if="props.student.turma.serie || props.student.turma.turma_letra">
+                                            ({{ [props.student.turma.serie, props.student.turma.turma_letra].filter(Boolean).join(' - ') }})
+                                        </template>
+                                        <template v-if="props.student.turma.ano_letivo">
+                                            - {{ props.student.turma.ano_letivo }}
+                                        </template>
+                                    </span>
+                                    <span v-else>—</span>
+                                </p>
                             </div>
                             <div>
                                 <p class="text-sm font-medium text-muted-foreground">Data de nascimento</p>
@@ -122,30 +134,13 @@ const breadcrumbItems: BreadcrumbItem[] = [
                                 </p>
                             </div>
                             <div>
-                                <p class="text-sm font-medium text-muted-foreground">Matrícula</p>
-                                <p class="mt-1">{{ props.student.matricula || '—' }}</p>
-                            </div>
-                            <div>
-                                <p class="text-sm font-medium text-muted-foreground">Série</p>
-                                <p class="mt-1">{{ props.student.serie || '—' }}</p>
-                            </div>
-                            <div>
-                                <p class="text-sm font-medium text-muted-foreground">Turma</p>
-                                <p class="mt-1">{{ props.student.turma || '—' }}</p>
-                            </div>
-                            <div>
-                                <p class="text-sm font-medium text-muted-foreground">Data da matrícula</p>
+                                <p class="text-sm font-medium text-muted-foreground">Foto</p>
                                 <p class="mt-1">
-                                    {{ props.student.data_matricula ? new Date(props.student.data_matricula).toLocaleDateString('pt-BR') : '—' }}
+                                    <a v-if="props.student.foto_url" :href="props.student.foto_url" target="_blank" class="text-blue-500 hover:underline">
+                                        Ver foto
+                                    </a>
+                                    <span v-else>—</span>
                                 </p>
-                            </div>
-                            <div>
-                                <p class="text-sm font-medium text-muted-foreground">E-mail</p>
-                                <p class="mt-1">{{ props.student.email || '—' }}</p>
-                            </div>
-                            <div>
-                                <p class="text-sm font-medium text-muted-foreground">Telefone</p>
-                                <p class="mt-1">{{ formatPhone(props.student.telefone) }}</p>
                             </div>
                             <div>
                                 <p class="text-sm font-medium text-muted-foreground">Status</p>
@@ -180,6 +175,94 @@ const breadcrumbItems: BreadcrumbItem[] = [
                         <h3 class="mb-4 text-lg font-semibold">Informações médicas</h3>
                         <p class="text-sm whitespace-pre-wrap">{{ props.student.informacoes_medicas }}</p>
                     </div>
+                </div>
+            </div>
+
+            <!-- Seção de Rematrícula -->
+            <div class="rounded-xl border bg-card p-6 shadow-sm">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <h3 class="text-lg font-semibold">Rematrícula</h3>
+                        <p class="text-sm text-muted-foreground">
+                            Rematricule este aluno em uma nova turma de um novo ano letivo.
+                        </p>
+                    </div>
+
+                    <Dialog v-model:open="reenrollDialogOpen">
+                        <DialogTrigger as-child>
+                            <Button variant="outline" class="flex items-center gap-2">
+                                <RefreshCw class="h-4 w-4" />
+                                Rematricular
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent class="max-w-2xl">
+                            <DialogHeader>
+                                <DialogTitle>Rematricular aluno</DialogTitle>
+                                <DialogDescription>
+                                    Selecione a nova turma para rematricular {{ props.student.nome }}.
+                                    A matrícula atual será desativada e uma nova será criada.
+                                </DialogDescription>
+                            </DialogHeader>
+
+                            <Form
+                                :action="`/school/students/${props.student.id}/reenroll`"
+                                method="post"
+                                @success="reenrollDialogOpen = false"
+                                class="mt-4 space-y-6"
+                                v-slot="{ processing, errors }"
+                            >
+                                <div class="grid gap-2">
+                                    <Label for="turma_id">Nova turma</Label>
+                                    <select
+                                        id="turma_id"
+                                        name="turma_id"
+                                        class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                        required
+                                    >
+                                        <option value="">Selecione uma turma</option>
+                                        <option
+                                            v-for="turma in props.turmas"
+                                            :key="turma.id"
+                                            :value="turma.id"
+                                        >
+                                            {{ turma.nome }}
+                                            <template v-if="turma.serie || turma.turma_letra">
+                                                ({{ [turma.serie, turma.turma_letra].filter(Boolean).join(' - ') }})
+                                            </template>
+                                            <template v-if="turma.ano_letivo">
+                                                - {{ turma.ano_letivo }}
+                                            </template>
+                                        </option>
+                                    </select>
+                                    <InputError :message="errors.turma_id" />
+                                    <p class="text-xs text-muted-foreground">
+                                        <strong>Turma atual:</strong>
+                                        <span v-if="props.student.turma">
+                                            {{ props.student.turma.nome }}
+                                            <template v-if="props.student.turma.ano_letivo">
+                                                ({{ props.student.turma.ano_letivo }})
+                                            </template>
+                                        </span>
+                                        <span v-else>Nenhuma</span>
+                                    </p>
+                                </div>
+
+                                <div class="flex items-center justify-end gap-2">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        @click="reenrollDialogOpen = false"
+                                    >
+                                        Cancelar
+                                    </Button>
+                                    <Button type="submit" :disabled="processing" class="flex items-center gap-2">
+                                        <RefreshCw class="h-4 w-4" />
+                                        {{ processing ? 'Rematriculando...' : 'Confirmar rematrícula' }}
+                                    </Button>
+                                </div>
+                            </Form>
+                        </DialogContent>
+                    </Dialog>
                 </div>
             </div>
         </div>

@@ -41,7 +41,20 @@ class User extends Authenticatable
      *
      * @var string
      */
-    protected $table = 'usuarios';
+    protected $table = 'shared.usuarios';
+
+    /**
+     * Get the table name for the model.
+     */
+    public function getTable(): string
+    {
+        // Em SQLite (testes), não existe schema. A migration cria a tabela como `usuarios`.
+        if ($this->getConnection()->getDriverName() === 'sqlite') {
+            return 'usuarios';
+        }
+
+        return parent::getTable();
+    }
 
     /**
      * The attributes that are mass assignable.
@@ -184,9 +197,13 @@ class User extends Authenticatable
      */
     public function tenants()
     {
+        $pivotTable = $this->getConnection()->getDriverName() === 'sqlite'
+            ? 'usuario_tenants'
+            : 'shared.usuario_tenants';
+
         return $this->belongsToMany(
             Tenant::class,
-            'usuario_tenants',
+            $pivotTable,
             'usuario_id',
             'tenant_id'
         )->withPivot('created_at');

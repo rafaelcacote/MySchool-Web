@@ -3,25 +3,15 @@ import Heading from '@/components/Heading.vue';
 import Pagination from '@/components/Pagination.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
-import { Head, Link, router } from '@inertiajs/vue3';
-import { Edit, GraduationCap, Plus, User } from 'lucide-vue-next';
-import { computed, ref } from 'vue';
+import { Head, Link } from '@inertiajs/vue3';
+import { ArrowLeft, BookOpen, GraduationCap, User } from 'lucide-vue-next';
 
 interface PaginationLink {
     url: string | null;
     label: string;
     active: boolean;
-}
-
-interface Turma {
-    id: string;
-    nome: string;
-    serie?: string | null;
-    turma_letra?: string | null;
-    ano_letivo?: string | null;
 }
 
 interface Student {
@@ -31,7 +21,16 @@ interface Student {
     foto_url?: string | null;
     data_nascimento?: string | null;
     ativo: boolean;
-    turma?: Turma | null;
+    matricula_id?: string;
+    data_matricula?: string | null;
+}
+
+interface Turma {
+    id: string;
+    nome: string;
+    serie?: string | null;
+    turma_letra?: string | null;
+    ano_letivo?: string | null;
 }
 
 interface Paginated<T> {
@@ -44,111 +43,61 @@ interface Paginated<T> {
 }
 
 interface Props {
+    turma: Turma;
     students: Paginated<Student>;
-    filters: {
-        search?: string | null;
-        active?: string | null;
-    };
 }
 
 const props = defineProps<Props>();
 
 const breadcrumbItems: BreadcrumbItem[] = [
     {
-        title: 'Alunos',
-        href: '/school/students',
+        title: 'Turmas',
+        href: '/school/classes',
+    },
+    {
+        title: props.turma.nome,
+        href: `/school/classes/${props.turma.id}/students`,
     },
 ];
-
-const search = ref(props.filters.search ?? '');
-const active = ref(props.filters.active ?? '');
-
-const hasAnyFilter = computed(
-    () => !!search.value || active.value !== '',
-);
-
-function applyFilters() {
-    router.get(
-        '/school/students',
-        {
-            search: search.value || undefined,
-            active: active.value || undefined,
-        },
-        {
-            preserveState: true,
-            preserveScroll: true,
-            replace: true,
-        },
-    );
-}
-
-function clearFilters() {
-    search.value = '';
-    active.value = '';
-    applyFilters();
-}
 </script>
 
 <template>
     <AppLayout :breadcrumbs="breadcrumbItems">
-        <Head title="Alunos" />
+        <Head :title="`Alunos da turma: ${props.turma.nome}`" />
 
         <div class="space-y-6">
             <div class="flex items-start justify-between gap-4">
                 <div class="mt-2">
                     <Heading
-                        title="Alunos"
-                        description="Gerencie os alunos cadastrados"
+                        :title="`Alunos - ${props.turma.nome}`"
+                        :description="`Lista de alunos matriculados na turma`"
                         :icon="GraduationCap"
                     />
                 </div>
 
-                <div class="mt-2">
-                    <Button as-child>
-                        <Link href="/school/students/create" class="flex items-center gap-2">
-                            <Plus class="h-4 w-4" />
-                            Novo aluno
-                        </Link>
-                    </Button>
-                </div>
+                <Button
+                    variant="ghost"
+                    as-child
+                    class="mt-4 rounded-lg border border-input bg-background shadow-sm transition-all hover:bg-accent hover:text-accent-foreground hover:shadow-md"
+                >
+                    <Link href="/school/classes" class="flex items-center gap-2 px-4 py-2">
+                        <ArrowLeft class="h-4 w-4" />
+                        Voltar
+                    </Link>
+                </Button>
             </div>
 
             <div class="rounded-xl border bg-card p-4 shadow-sm">
-                <div
-                    class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
-                >
-                    <div class="flex flex-1 flex-col gap-3 sm:flex-row">
-                        <div class="flex-1">
-                            <Input
-                                v-model="search"
-                                placeholder="Buscar por nome ou nome social..."
-                                @keyup.enter="applyFilters"
-                            />
-                        </div>
-
-                        <select
-                            v-model="active"
-                            class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm sm:w-44"
-                            @change="applyFilters"
-                        >
-                            <option value="">Todos status</option>
-                            <option value="true">Ativos</option>
-                            <option value="false">Inativos</option>
-                        </select>
-                    </div>
-
-                    <div class="flex items-center gap-2">
-                        <Button variant="secondary" @click="applyFilters">
-                            Filtrar
-                        </Button>
-                        <Button
-                            v-if="hasAnyFilter"
-                            variant="ghost"
-                            @click="clearFilters"
-                        >
-                            Limpar
-                        </Button>
-                    </div>
+                <div class="mb-4">
+                    <h3 class="text-lg font-semibold">{{ props.turma.nome }}</h3>
+                    <p class="text-sm text-muted-foreground">
+                        <template v-if="props.turma.serie || props.turma.turma_letra">
+                            {{ [props.turma.serie, props.turma.turma_letra].filter(Boolean).join(' - ') }}
+                        </template>
+                        <template v-if="props.turma.ano_letivo">
+                            • Ano letivo: {{ props.turma.ano_letivo }}
+                        </template>
+                    </p>
                 </div>
             </div>
 
@@ -161,8 +110,8 @@ function clearFilters() {
                             <tr>
                                 <th class="px-4 py-3">Nome</th>
                                 <th class="px-4 py-3">Nome social</th>
-                                <th class="px-4 py-3">Turma</th>
                                 <th class="px-4 py-3">Data de nascimento</th>
+                                <th class="px-4 py-3">Data de matrícula</th>
                                 <th class="px-4 py-3">Status</th>
                                 <th class="px-4 py-3 text-right">Ações</th>
                             </tr>
@@ -183,19 +132,10 @@ function clearFilters() {
                                     {{ student.nome_social || '—' }}
                                 </td>
                                 <td class="px-4 py-3">
-                                    <span v-if="student.turma">
-                                        {{ student.turma.nome }}
-                                        <template v-if="student.turma.serie || student.turma.turma_letra">
-                                            ({{ [student.turma.serie, student.turma.turma_letra].filter(Boolean).join(' - ') }})
-                                        </template>
-                                        <template v-if="student.turma.ano_letivo">
-                                            - {{ student.turma.ano_letivo }}
-                                        </template>
-                                    </span>
-                                    <span v-else>—</span>
+                                    {{ student.data_nascimento ? new Date(student.data_nascimento).toLocaleDateString('pt-BR') : '—' }}
                                 </td>
                                 <td class="px-4 py-3">
-                                    {{ student.data_nascimento ? new Date(student.data_nascimento).toLocaleDateString('pt-BR') : '—' }}
+                                    {{ student.data_matricula ? new Date(student.data_matricula).toLocaleDateString('pt-BR') : '—' }}
                                 </td>
                                 <td class="px-4 py-3">
                                     <Badge
@@ -220,18 +160,6 @@ function clearFilters() {
                                                 />
                                             </Link>
                                         </Button>
-                                        <Button
-                                            as-child
-                                            size="sm"
-                                            variant="ghost"
-                                            class="hover:bg-transparent"
-                                        >
-                                            <Link :href="`/school/students/${student.id}/edit`">
-                                                <Edit
-                                                    class="h-4 w-4 text-amber-500 dark:text-amber-400"
-                                                />
-                                            </Link>
-                                        </Button>
                                     </div>
                                 </td>
                             </tr>
@@ -241,7 +169,7 @@ function clearFilters() {
                                     colspan="6"
                                     class="px-4 py-10 text-center text-sm text-muted-foreground"
                                 >
-                                    Nenhum aluno encontrado.
+                                    Nenhum aluno matriculado nesta turma.
                                 </td>
                             </tr>
                         </tbody>
@@ -252,7 +180,7 @@ function clearFilters() {
                     class="flex flex-col gap-3 border-t p-4 sm:flex-row sm:items-center sm:justify-between"
                 >
                     <p class="text-sm text-muted-foreground">
-                        Total: <span class="font-medium">{{ props.students.total }}</span>
+                        Total: <span class="font-medium">{{ props.students.total }}</span> aluno(s)
                     </p>
                     <Pagination :links="props.students.links" />
                 </div>

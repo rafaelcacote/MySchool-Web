@@ -58,6 +58,13 @@ class Student extends Model
             : 'escola.aluno_responsavel';
     }
 
+    protected function matriculasTurmaPivotTable(): string
+    {
+        return $this->getConnection()->getDriverName() === 'sqlite'
+            ? 'matriculas_turma'
+            : 'escola.matriculas_turma';
+    }
+
     /**
      * The attributes that are mass assignable.
      *
@@ -65,12 +72,10 @@ class Student extends Model
      */
     protected $fillable = [
         'tenant_id',
-        'usuario_id',
-        'matricula',
-        'serie',
-        'turma',
+        'nome',
+        'nome_social',
+        'foto_url',
         'data_nascimento',
-        'data_matricula',
         'informacoes_medicas',
         'ativo',
     ];
@@ -84,7 +89,6 @@ class Student extends Model
     {
         return [
             'data_nascimento' => 'date',
-            'data_matricula' => 'date',
             'ativo' => 'boolean',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
@@ -101,14 +105,6 @@ class Student extends Model
     }
 
     /**
-     * Get the user (usuário) that owns the student.
-     */
-    public function user(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'usuario_id');
-    }
-
-    /**
      * Get the parents (responsáveis) for the student.
      */
     public function parents(): BelongsToMany
@@ -116,5 +112,16 @@ class Student extends Model
         return $this->belongsToMany(Responsavel::class, $this->alunoResponsavelPivotTable(), 'aluno_id', 'responsavel_id')
             ->withPivot(['tenant_id', 'principal'])
             ->wherePivot('tenant_id', $this->tenant_id);
+    }
+
+    /**
+     * Get the classes (turmas) for the student.
+     */
+    public function turmas(): BelongsToMany
+    {
+        return $this->belongsToMany(Turma::class, $this->matriculasTurmaPivotTable(), 'aluno_id', 'turma_id')
+            ->withPivot(['tenant_id', 'data_matricula', 'status'])
+            ->wherePivot('tenant_id', $this->tenant_id)
+            ->wherePivot('status', 'ativo');
     }
 }

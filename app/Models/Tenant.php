@@ -37,7 +37,20 @@ class Tenant extends Model
      *
      * @var string
      */
-    protected $table = 'tenants';
+    protected $table = 'shared.tenants';
+
+    /**
+     * Get the table name for the model.
+     */
+    public function getTable(): string
+    {
+        // Em SQLite (testes), não existe schema. A migration cria a tabela como `tenants`.
+        if ($this->getConnection()->getDriverName() === 'sqlite') {
+            return 'tenants';
+        }
+
+        return parent::getTable();
+    }
 
     /**
      * The attributes that are mass assignable.

@@ -33,6 +33,9 @@ Route::middleware(['auth'])->prefix('school')->name('school.')->group(function (
     Route::patch('students/{student}', [StudentsController::class, 'update'])
         ->middleware('permission:escola.alunos.editar')
         ->name('students.update');
+    Route::post('students/{student}/reenroll', [StudentsController::class, 'reenroll'])
+        ->middleware('permission:escola.alunos.editar')
+        ->name('students.reenroll');
     Route::delete('students/{student}', [StudentsController::class, 'destroy'])
         ->middleware('permission:escola.alunos.excluir')
         ->name('students.destroy');
@@ -99,6 +102,9 @@ Route::middleware(['auth'])->prefix('school')->name('school.')->group(function (
     Route::get('classes/{class}', [ClassesController::class, 'show'])
         ->middleware('permission:escola.turmas.visualizar')
         ->name('classes.show');
+    Route::get('classes/{class}/students', [ClassesController::class, 'students'])
+        ->middleware('permission:escola.turmas.visualizar')
+        ->name('classes.students');
     Route::get('classes/{class}/edit', [ClassesController::class, 'edit'])
         ->middleware('permission:escola.turmas.editar')
         ->name('classes.edit');

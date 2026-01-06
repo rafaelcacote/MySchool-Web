@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Turma extends Model
@@ -97,5 +98,23 @@ class Turma extends Model
     public function professor(): BelongsTo
     {
         return $this->belongsTo(Teacher::class, 'professor_id');
+    }
+
+    protected function matriculasTurmaPivotTable(): string
+    {
+        return $this->getConnection()->getDriverName() === 'sqlite'
+            ? 'matriculas_turma'
+            : 'escola.matriculas_turma';
+    }
+
+    /**
+     * Get the students (alunos) for the class.
+     */
+    public function alunos(): BelongsToMany
+    {
+        return $this->belongsToMany(Student::class, $this->matriculasTurmaPivotTable(), 'turma_id', 'aluno_id')
+            ->withPivot(['tenant_id', 'data_matricula', 'status'])
+            ->wherePivot('tenant_id', $this->tenant_id)
+            ->wherePivot('status', 'ativo');
     }
 }

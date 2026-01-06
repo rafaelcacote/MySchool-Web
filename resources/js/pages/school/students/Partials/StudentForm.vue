@@ -4,124 +4,86 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Save } from 'lucide-vue-next';
-import { onMounted, ref } from 'vue';
+
+interface Turma {
+    id: string;
+    nome: string;
+    serie?: string | null;
+    turma_letra?: string | null;
+    ano_letivo?: string | null;
+}
 
 interface Student {
     id?: string;
-    nome_completo?: string;
-    cpf?: string | null;
+    nome?: string | null;
+    nome_social?: string | null;
+    foto_url?: string | null;
     data_nascimento?: string | null;
-    data_matricula?: string | null;
-    telefone?: string | null;
-    email?: string | null;
-    matricula?: string | null;
-    serie?: string | null;
-    turma?: string | null;
     ativo?: boolean;
     informacoes_medicas?: string | null;
 }
 
 const props = defineProps<{
     student?: Student;
+    turmas?: Turma[];
     submitLabel: string;
     processing: boolean;
     errors: Record<string, string>;
 }>();
-
-const phoneDisplay = ref('');
-const cpfDisplay = ref('');
-
-function formatCPF(value: string): string {
-    const numbers = value.replace(/\D/g, '');
-    const limitedNumbers = numbers.slice(0, 11);
-    if (limitedNumbers.length <= 3) {
-        return limitedNumbers;
-    } else if (limitedNumbers.length <= 6) {
-        return `${limitedNumbers.slice(0, 3)}.${limitedNumbers.slice(3)}`;
-    } else if (limitedNumbers.length <= 9) {
-        return `${limitedNumbers.slice(0, 3)}.${limitedNumbers.slice(3, 6)}.${limitedNumbers.slice(6)}`;
-    } else {
-        return `${limitedNumbers.slice(0, 3)}.${limitedNumbers.slice(3, 6)}.${limitedNumbers.slice(6, 9)}-${limitedNumbers.slice(9, 11)}`;
-    }
-}
-
-function handleCPFInput(value: string | number) {
-    const numbers = String(value).replace(/\D/g, '');
-    const limitedNumbers = numbers.slice(0, 11);
-    cpfDisplay.value = formatCPF(limitedNumbers);
-    const hiddenInput = document.querySelector('input[name="cpf"]') as HTMLInputElement;
-    if (hiddenInput) {
-        hiddenInput.value = limitedNumbers;
-    }
-}
-
-function formatPhone(value: string): string {
-    const numbers = value.replace(/\D/g, '');
-    if (numbers.length <= 2) {
-        return numbers.length > 0 ? `(${numbers}` : '';
-    } else if (numbers.length <= 6) {
-        return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`;
-    } else if (numbers.length <= 10) {
-        return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 6)}-${numbers.slice(6)}`;
-    } else {
-        return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7, 11)}`;
-    }
-}
-
-function handlePhoneInput(value: string | number) {
-    const numbers = String(value).replace(/\D/g, '');
-    const limitedNumbers = numbers.slice(0, 11);
-    phoneDisplay.value = formatPhone(limitedNumbers);
-    const hiddenInput = document.querySelector('input[name="telefone"]') as HTMLInputElement;
-    if (hiddenInput) {
-        hiddenInput.value = limitedNumbers;
-    }
-}
-
-onMounted(() => {
-    if (props.student?.telefone) {
-        phoneDisplay.value = formatPhone(props.student.telefone);
-    }
-    if (props.student?.cpf) {
-        cpfDisplay.value = formatCPF(props.student.cpf);
-    }
-});
 </script>
 
 <template>
     <div class="grid gap-6">
         <div class="grid gap-6 sm:grid-cols-2">
             <div class="grid gap-2">
-                <Label for="nome_completo">Nome completo</Label>
+                <Label for="nome">Nome completo</Label>
                 <Input
-                    id="nome_completo"
-                    name="nome_completo"
-                    :default-value="student?.nome_completo ?? ''"
-                    placeholder="Ex: João Silva"
+                    id="nome"
+                    name="nome"
+                    :default-value="student?.nome ?? ''"
+                    placeholder="Ex: João Silva Santos"
                     required
-                    autocomplete="name"
                 />
-                <InputError :message="errors.nome_completo" />
+                <InputError :message="errors.nome" />
             </div>
 
             <div class="grid gap-2">
-                <Label for="cpf">CPF</Label>
-                <div class="relative">
-                    <Input
-                        id="cpf"
-                        :model-value="cpfDisplay"
-                        placeholder="000.000.000-00"
-                        autocomplete="off"
-                        @update:model-value="handleCPFInput"
-                    />
-                    <input
-                        type="hidden"
-                        name="cpf"
-                        :value="cpfDisplay.replace(/\D/g, '')"
-                    />
-                </div>
-                <InputError :message="errors.cpf" />
+                <Label for="nome_social">Nome social</Label>
+                <Input
+                    id="nome_social"
+                    name="nome_social"
+                    :default-value="student?.nome_social ?? ''"
+                    placeholder="Ex: Maria"
+                />
+                <InputError :message="errors.nome_social" />
             </div>
+        </div>
+
+        <div class="grid gap-2">
+            <Label for="turma_id">Turma</Label>
+            <select
+                id="turma_id"
+                name="turma_id"
+                class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                required
+            >
+                <option value="">Selecione uma turma</option>
+                <option
+                    v-for="turma in props.turmas"
+                    :key="turma.id"
+                    :value="turma.id"
+                    :selected="student?.turma_id === turma.id"
+                >
+                    {{ turma.nome }}
+                    <template v-if="turma.serie || turma.turma_letra">
+                        ({{ [turma.serie, turma.turma_letra].filter(Boolean).join(' - ') }})
+                    </template>
+                    <template v-if="turma.ano_letivo">
+                        - {{ turma.ano_letivo }}
+                    </template>
+                </option>
+            </select>
+            <InputError :message="errors.turma_id" />
         </div>
 
         <div class="grid gap-6 sm:grid-cols-2">
@@ -137,123 +99,49 @@ onMounted(() => {
             </div>
 
             <div class="grid gap-2">
-                <Label for="matricula">Matrícula</Label>
+                <Label for="foto_url">URL da foto</Label>
                 <Input
-                    id="matricula"
-                    name="matricula"
-                    :default-value="student?.matricula ?? ''"
-                    placeholder="Ex: 2024001"
-                    required
+                    id="foto_url"
+                    name="foto_url"
+                    type="url"
+                    :default-value="student?.foto_url ?? ''"
+                    placeholder="https://exemplo.com/foto.jpg"
                 />
-                <InputError :message="errors.matricula" />
+                <InputError :message="errors.foto_url" />
             </div>
         </div>
 
-        <div class="grid gap-6 sm:grid-cols-2">
-            <div class="grid gap-2">
-                <Label for="serie">Série</Label>
-                <Input
-                    id="serie"
-                    name="serie"
-                    :default-value="student?.serie ?? ''"
-                    placeholder="Ex: 5º ano"
-                    required
+        <div class="grid gap-2">
+            <Label for="ativo">Status</Label>
+            <label
+                class="flex h-10 items-center gap-2 rounded-md border border-input bg-background px-3 text-sm"
+            >
+                <input
+                    type="hidden"
+                    name="ativo"
+                    :value="student?.ativo === false ? '0' : '1'"
                 />
-                <InputError :message="errors.serie" />
-            </div>
-
-            <div class="grid gap-2">
-                <Label for="turma">Turma</Label>
-                <Input
-                    id="turma"
-                    name="turma"
-                    :default-value="student?.turma ?? ''"
-                    placeholder="Ex: A"
+                <input
+                    id="ativo"
+                    type="checkbox"
+                    name="_ativo_toggle"
+                    class="h-4 w-4 rounded border border-input"
+                    :checked="student?.ativo !== false"
+                    @change="
+                        (e) => {
+                            const checked = (e.target as HTMLInputElement).checked;
+                            const hidden = (e.currentTarget as HTMLInputElement)
+                                .closest('label')
+                                ?.querySelector('input[type=hidden][name=ativo]') as HTMLInputElement | null;
+                            if (hidden) hidden.value = checked ? '1' : '0';
+                        }
+                    "
                 />
-                <InputError :message="errors.turma" />
-            </div>
-        </div>
-
-        <div class="grid gap-6 sm:grid-cols-2">
-            <div class="grid gap-2">
-                <Label for="data_matricula">Data da matrícula</Label>
-                <Input
-                    id="data_matricula"
-                    name="data_matricula"
-                    type="date"
-                    :default-value="student?.data_matricula ?? ''"
-                />
-                <InputError :message="errors.data_matricula" />
-            </div>
-        </div>
-
-        <div class="grid gap-6 sm:grid-cols-2">
-            <div class="grid gap-2">
-                <Label for="email">E-mail</Label>
-                <Input
-                    id="email"
-                    name="email"
-                    type="email"
-                    :default-value="student?.email ?? ''"
-                    placeholder="joao@exemplo.com"
-                    autocomplete="email"
-                />
-                <InputError :message="errors.email" />
-            </div>
-
-            <div class="grid gap-2">
-                <Label for="telefone">Telefone</Label>
-                <div class="relative">
-                    <Input
-                        id="telefone"
-                        :model-value="phoneDisplay"
-                        placeholder="(11) 99999-9999 ou (11) 3333-4444"
-                        autocomplete="tel"
-                        @update:model-value="handlePhoneInput"
-                    />
-                    <input
-                        type="hidden"
-                        name="telefone"
-                        :value="phoneDisplay.replace(/\D/g, '')"
-                    />
-                </div>
-                <InputError :message="errors.telefone" />
-            </div>
-        </div>
-
-        <div class="grid gap-6 sm:grid-cols-2">
-            <div class="grid gap-2">
-                <Label for="ativo">Status</Label>
-                <label
-                    class="flex h-10 items-center gap-2 rounded-md border border-input bg-background px-3 text-sm"
-                >
-                    <input
-                        type="hidden"
-                        name="ativo"
-                        :value="student?.ativo === false ? '0' : '1'"
-                    />
-                    <input
-                        id="ativo"
-                        type="checkbox"
-                        name="_ativo_toggle"
-                        class="h-4 w-4 rounded border border-input"
-                        :checked="student?.ativo !== false"
-                        @change="
-                            (e) => {
-                                const checked = (e.target as HTMLInputElement).checked;
-                                const hidden = (e.currentTarget as HTMLInputElement)
-                                    .closest('label')
-                                    ?.querySelector('input[type=hidden][name=ativo]') as HTMLInputElement | null;
-                                if (hidden) hidden.value = checked ? '1' : '0';
-                            }
-                        "
-                    />
-                    <span class="text-muted-foreground">
-                        {{ student?.ativo === false ? 'Inativo' : 'Ativo' }}
-                    </span>
-                </label>
-                <InputError :message="errors.ativo" />
-            </div>
+                <span class="text-muted-foreground">
+                    {{ student?.ativo === false ? 'Inativo' : 'Ativo' }}
+                </span>
+            </label>
+            <InputError :message="errors.ativo" />
         </div>
 
         <div class="grid gap-2">

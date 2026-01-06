@@ -3,35 +3,31 @@
 namespace App\Http\Controllers\School;
 
 use App\Actions\School\CreateStudentAction;
+use App\Actions\School\ReenrollStudentAction;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\School\ReenrollStudentRequest;
 use App\Http\Requests\School\StoreStudentRequest;
 use App\Http\Requests\School\UpdateStudentRequest;
 use App\Models\Student;
-use App\Models\User;
+use App\Models\Turma;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class StudentsController extends Controller
 {
-    public function __construct(protected CreateStudentAction $createStudentAction) {}
+    public function __construct(
+        protected CreateStudentAction $createStudentAction,
+        protected ReenrollStudentAction $reenrollStudentAction
+    ) {}
 
     protected function alunosTable(): string
     {
         return DB::connection('shared')->getDriverName() === 'sqlite'
             ? 'alunos'
             : 'escola.alunos';
-    }
-
-    protected function usuariosTable(): string
-    {
-        return DB::connection('shared')->getDriverName() === 'sqlite'
-            ? 'usuarios'
-            : 'shared.usuarios';
     }
 
     /**
@@ -60,21 +56,17 @@ class StudentsController extends Controller
         $connection = DB::connection('shared');
         $driver = $connection->getDriverName();
         $likeOperator = $driver === 'pgsql' ? 'ilike' : 'like';
+        $pivotTable = $driver === 'sqlite' ? 'matriculas_turma' : 'escola.matriculas_turma';
 
-        $students = $connection
+        $studentsQuery = $connection
             ->table($this->alunosTable().' as alunos')
-            ->join($this->usuariosTable().' as usuarios', 'usuarios.id', '=', 'alunos.usuario_id')
             ->where('alunos.tenant_id', $tenant->id)
             ->when($filters['search'] ?? null, function ($query, string $search) use ($likeOperator) {
                 $search = trim($search);
-                $cpfSearch = preg_replace('/[^0-9]/', '', $search);
 
-                $query->where(function ($q) use ($search, $cpfSearch, $likeOperator) {
-                    $q->where('usuarios.nome_completo', $likeOperator, "%{$search}%")
-                        ->orWhere('usuarios.email', $likeOperator, "%{$search}%")
-                        ->orWhere('usuarios.telefone', $likeOperator, "%{$search}%")
-                        ->orWhere('alunos.matricula', $likeOperator, "%{$search}%")
-                        ->orWhere('usuarios.cpf', $likeOperator, "%{$cpfSearch}%");
+                $query->where(function ($q) use ($search, $likeOperator) {
+                    $q->where('alunos.nome', $likeOperator, "%{$search}%")
+                        ->orWhere('alunos.nome_social', $likeOperator, "%{$search}%");
                 });
             })
             ->when(isset($filters['active']) && $filters['active'] !== '' && $filters['active'] !== null, function ($query) use ($filters) {
@@ -83,18 +75,54 @@ class StudentsController extends Controller
                     $query->where('alunos.ativo', $active);
                 }
             })
-            ->orderBy('usuarios.nome_completo')
+            ->orderBy('alunos.nome')
             ->select([
                 'alunos.id',
-                'alunos.matricula',
+                'alunos.nome',
+                'alunos.nome_social',
+                'alunos.foto_url',
+                'alunos.data_nascimento',
                 'alunos.ativo',
-                'usuarios.nome_completo',
-                'usuarios.cpf',
-                'usuarios.email',
-                'usuarios.telefone',
-            ])
-            ->paginate(10)
-            ->withQueryString();
+            ]);
+
+        $students = $studentsQuery->paginate(10)->withQueryString();
+
+        // Buscar turmas dos alunos
+        $studentIds = collect($students->items())->pluck('id')->toArray();
+        $matriculas = ! empty($studentIds) ? $connection
+            ->table($pivotTable)
+            ->where('tenant_id', $tenant->id)
+            ->where('status', 'ativo')
+            ->whereIn('aluno_id', $studentIds)
+            ->get(['aluno_id', 'turma_id']) : collect();
+
+        $turmaIds = $matriculas->pluck('turma_id')->unique()->toArray();
+        $turmasMap = ! empty($turmaIds) ? Turma::query()
+            ->whereIn('id', $turmaIds)
+            ->get(['id', 'nome', 'serie', 'turma_letra', 'ano_letivo'])
+            ->keyBy('id') : collect();
+
+        $matriculasMap = $matriculas->groupBy('aluno_id')->map(function ($items) {
+            return $items->first()->turma_id;
+        });
+
+        // Adicionar turma a cada aluno
+        $transformedItems = $students->getCollection()->map(function ($student) use ($matriculasMap, $turmasMap) {
+            $turmaId = $matriculasMap->get($student->id);
+            $turma = $turmaId ? $turmasMap->get($turmaId) : null;
+
+            $student->turma = $turma ? [
+                'id' => $turma->id,
+                'nome' => $turma->nome,
+                'serie' => $turma->serie,
+                'turma_letra' => $turma->turma_letra,
+                'ano_letivo' => $turma->ano_letivo,
+            ] : null;
+
+            return $student;
+        });
+
+        $students->setCollection($transformedItems);
 
         return Inertia::render('school/students/Index', [
             'students' => $students,
@@ -107,7 +135,17 @@ class StudentsController extends Controller
      */
     public function create(): Response
     {
-        return Inertia::render('school/students/Create');
+        $tenant = $this->getTenant();
+
+        $turmas = Turma::query()
+            ->where('tenant_id', $tenant->id)
+            ->where('ativo', true)
+            ->orderBy('nome')
+            ->get(['id', 'nome', 'serie', 'turma_letra', 'ano_letivo']);
+
+        return Inertia::render('school/students/Create', [
+            'turmas' => $turmas,
+        ]);
     }
 
     /**
@@ -142,28 +180,70 @@ class StudentsController extends Controller
             abort(404);
         }
 
-        $student->load(['user', 'parents.user']);
+        $student->load(['parents.user']);
+
+        // Buscar turma do aluno
+        $driver = DB::connection('shared')->getDriverName();
+        $pivotTable = $driver === 'sqlite' ? 'matriculas_turma' : 'escola.matriculas_turma';
+
+        $matricula = DB::connection('shared')
+            ->table($pivotTable)
+            ->where('tenant_id', $tenant->id)
+            ->where('aluno_id', $student->id)
+            ->where('status', 'ativo')
+            ->first(['turma_id']);
+
+        $turma = null;
+        if ($matricula) {
+            $turma = Turma::query()
+                ->where('id', $matricula->turma_id)
+                ->first(['id', 'nome', 'serie', 'turma_letra', 'ano_letivo']);
+        }
+
+        // Buscar turmas disponíveis para rematrícula (excluindo a turma atual)
+        $turmasQuery = Turma::query()
+            ->where('tenant_id', $tenant->id)
+            ->where('ativo', true);
+
+        if ($turma) {
+            $turmasQuery->where('id', '!=', $turma->id);
+        }
+
+        $turmas = $turmasQuery
+            ->orderBy('ano_letivo', 'desc')
+            ->orderBy('serie')
+            ->orderBy('nome')
+            ->get(['id', 'nome', 'serie', 'turma_letra', 'ano_letivo']);
 
         return Inertia::render('school/students/Show', [
             'student' => [
                 'id' => $student->id,
-                'nome_completo' => $student->user?->nome_completo,
-                'cpf' => $student->user?->cpf,
-                'email' => $student->user?->email,
-                'telefone' => $student->user?->telefone,
-                'matricula' => $student->matricula,
-                'serie' => $student->serie,
-                'turma' => $student->turma,
+                'nome' => $student->nome,
+                'nome_social' => $student->nome_social,
+                'foto_url' => $student->foto_url,
                 'data_nascimento' => optional($student->data_nascimento)->toDateString(),
-                'data_matricula' => optional($student->data_matricula)->toDateString(),
                 'informacoes_medicas' => $student->informacoes_medicas,
                 'ativo' => (bool) $student->ativo,
+                'turma' => $turma ? [
+                    'id' => $turma->id,
+                    'nome' => $turma->nome,
+                    'serie' => $turma->serie,
+                    'turma_letra' => $turma->turma_letra,
+                    'ano_letivo' => $turma->ano_letivo,
+                ] : null,
                 'parents' => $student->parents->map(fn ($parent) => [
                     'id' => $parent->id,
                     'nome_completo' => $parent->user?->nome_completo,
                     'parentesco' => $parent->parentesco,
                 ])->values(),
             ],
+            'turmas' => $turmas->map(fn ($t) => [
+                'id' => $t->id,
+                'nome' => $t->nome,
+                'serie' => $t->serie,
+                'turma_letra' => $t->turma_letra,
+                'ano_letivo' => $t->ano_letivo,
+            ])->values(),
         ]);
     }
 
@@ -178,28 +258,37 @@ class StudentsController extends Controller
             abort(404);
         }
 
-        $student->load(['user', 'parents.user']);
+        // Buscar turma atual do aluno
+        $driver = DB::connection('shared')->getDriverName();
+        $pivotTable = $driver === 'sqlite' ? 'matriculas_turma' : 'escola.matriculas_turma';
+
+        $matricula = DB::connection('shared')
+            ->table($pivotTable)
+            ->where('tenant_id', $tenant->id)
+            ->where('aluno_id', $student->id)
+            ->where('status', 'ativo')
+            ->first(['turma_id']);
+
+        $turmaAtualId = $matricula?->turma_id;
+
+        $turmas = Turma::query()
+            ->where('tenant_id', $tenant->id)
+            ->where('ativo', true)
+            ->orderBy('nome')
+            ->get(['id', 'nome', 'serie', 'turma_letra', 'ano_letivo']);
 
         return Inertia::render('school/students/Edit', [
             'student' => [
                 'id' => $student->id,
-                'nome_completo' => $student->user?->nome_completo,
-                'cpf' => $student->user?->cpf,
-                'email' => $student->user?->email,
-                'telefone' => $student->user?->telefone,
-                'matricula' => $student->matricula,
-                'serie' => $student->serie,
-                'turma' => $student->turma,
+                'nome' => $student->nome,
+                'nome_social' => $student->nome_social,
+                'foto_url' => $student->foto_url,
                 'data_nascimento' => optional($student->data_nascimento)->toDateString(),
-                'data_matricula' => optional($student->data_matricula)->toDateString(),
                 'informacoes_medicas' => $student->informacoes_medicas,
                 'ativo' => (bool) $student->ativo,
-                'parents' => $student->parents->map(fn ($parent) => [
-                    'id' => $parent->id,
-                    'nome_completo' => $parent->user?->nome_completo,
-                    'parentesco' => $parent->parentesco,
-                ])->values(),
+                'turma_id' => $turmaAtualId,
             ],
+            'turmas' => $turmas,
         ]);
     }
 
@@ -216,36 +305,67 @@ class StudentsController extends Controller
 
         $validated = $request->validated();
 
-        DB::connection('shared')->transaction(function () use ($tenant, $student, $validated) {
-            $user = null;
-
-            if (! empty($student->usuario_id)) {
-                $user = User::query()->find($student->usuario_id);
-            }
-
-            if (! $user) {
-                $user = new User;
-                $user->password_hash = Hash::make(! empty($validated['cpf']) ? $validated['cpf'] : Str::random(32));
-            }
-
-            $user->nome_completo = $validated['nome_completo'];
-            $user->cpf = $validated['cpf'] ?? null;
-            $user->email = $validated['email'] ?? null;
-            $user->telefone = $validated['telefone'] ?? null;
-            $user->ativo = $validated['ativo'] ?? $user->ativo ?? true;
-            $user->save();
-            $user->tenants()->syncWithoutDetaching([$tenant->id]);
-
+        DB::connection('shared')->transaction(function () use ($student, $validated, $tenant) {
             $student->update([
-                'usuario_id' => $user->id,
-                'matricula' => $validated['matricula'],
-                'serie' => $validated['serie'],
-                'turma' => $validated['turma'] ?? null,
+                'nome' => $validated['nome'],
+                'nome_social' => $validated['nome_social'] ?? null,
+                'foto_url' => $validated['foto_url'] ?? null,
                 'data_nascimento' => $validated['data_nascimento'] ?? null,
-                'data_matricula' => $validated['data_matricula'] ?? null,
                 'informacoes_medicas' => $validated['informacoes_medicas'] ?? null,
                 'ativo' => $validated['ativo'] ?? true,
             ]);
+
+            // Atualizar turma do aluno se fornecida
+            if (isset($validated['turma_id'])) {
+                $driver = DB::connection('shared')->getDriverName();
+                $pivotTable = $driver === 'sqlite' ? 'matriculas_turma' : 'escola.matriculas_turma';
+
+                $turma = Turma::findOrFail($validated['turma_id']);
+
+                if ($turma->tenant_id !== $tenant->id) {
+                    throw new \Exception('Turma não pertence ao tenant');
+                }
+
+                // Desativar matrícula atual se existir
+                DB::connection('shared')
+                    ->table($pivotTable)
+                    ->where('tenant_id', $tenant->id)
+                    ->where('aluno_id', $student->id)
+                    ->where('status', 'ativo')
+                    ->update(['status' => 'inativo']);
+
+                // Verificar se já existe matrícula para esta turma
+                $matriculaExistente = DB::connection('shared')
+                    ->table($pivotTable)
+                    ->where('tenant_id', $tenant->id)
+                    ->where('aluno_id', $student->id)
+                    ->where('turma_id', $turma->id)
+                    ->first();
+
+                if ($matriculaExistente) {
+                    // Reativar matrícula existente
+                    DB::connection('shared')
+                        ->table($pivotTable)
+                        ->where('id', $matriculaExistente->id)
+                        ->update([
+                            'status' => 'ativo',
+                            'data_matricula' => now()->toDateString(),
+                        ]);
+                } else {
+                    // Criar nova matrícula
+                    $matriculaId = \Illuminate\Support\Str::uuid();
+
+                    DB::connection('shared')->table($pivotTable)->insert([
+                        'id' => $matriculaId,
+                        'tenant_id' => $tenant->id,
+                        'aluno_id' => $student->id,
+                        'turma_id' => $turma->id,
+                        'data_matricula' => now()->toDateString(),
+                        'status' => 'ativo',
+                        'created_at' => now(),
+                    ]);
+                }
+            }
         });
 
         return redirect()
@@ -277,5 +397,40 @@ class StudentsController extends Controller
                 'title' => 'Aluno excluído',
                 'message' => 'O aluno foi removido com sucesso.',
             ]);
+    }
+
+    /**
+     * Rematricular um aluno em uma nova turma de um novo ano letivo.
+     */
+    public function reenroll(ReenrollStudentRequest $request, Student $student): RedirectResponse
+    {
+        $tenant = $this->getTenant();
+
+        if ($student->tenant_id !== $tenant->id) {
+            abort(404);
+        }
+
+        $validated = $request->validated();
+        $novaTurma = Turma::findOrFail($validated['turma_id']);
+
+        try {
+            $this->reenrollStudentAction->execute($student, $novaTurma, $tenant);
+
+            return redirect()
+                ->route('school.students.show', $student)
+                ->with('toast', [
+                    'type' => 'success',
+                    'title' => 'Rematrícula realizada',
+                    'message' => "O aluno foi rematriculado na turma {$novaTurma->nome} ({$novaTurma->ano_letivo}).",
+                ]);
+        } catch (\Exception $e) {
+            return redirect()
+                ->route('school.students.show', $student)
+                ->with('toast', [
+                    'type' => 'error',
+                    'title' => 'Erro na rematrícula',
+                    'message' => $e->getMessage(),
+                ]);
+        }
     }
 }

@@ -7,6 +7,20 @@ import { Form, Head, Link } from '@inertiajs/vue3';
 import { ArrowLeft, GraduationCap } from 'lucide-vue-next';
 import StudentForm from './Partials/StudentForm.vue';
 
+interface Turma {
+    id: string;
+    nome: string;
+    serie?: string | null;
+    turma_letra?: string | null;
+    ano_letivo?: string | null;
+}
+
+interface Props {
+    turmas?: Turma[];
+}
+
+const props = defineProps<Props>();
+
 const breadcrumbItems: BreadcrumbItem[] = [
     {
         title: 'Alunos',
@@ -54,6 +68,7 @@ const breadcrumbItems: BreadcrumbItem[] = [
                     v-slot="{ errors, processing }"
                 >
                     <StudentForm
+                        :turmas="props.turmas"
                         submit-label="Criar aluno"
                         :processing="processing"
                         :errors="errors"

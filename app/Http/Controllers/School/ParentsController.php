@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\School\StoreParentRequest;
 use App\Http\Requests\School\UpdateParentRequest;
 use App\Models\Responsavel;
+use App\Models\Turma;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -40,7 +41,12 @@ class ParentsController extends Controller
         $filters = $request->only(['search', 'active']);
 
         $parents = Responsavel::query()
-            ->with('user')
+            ->with([
+                'user',
+                'students' => function ($query) use ($tenant) {
+                    $query->wherePivot('tenant_id', $tenant->id);
+                },
+            ])
             ->where('tenant_id', $tenant->id)
             ->when($filters['search'] ?? null, function ($query, string $search) {
                 $search = trim($search);
@@ -75,8 +81,33 @@ class ParentsController extends Controller
         $total = $parents->count();
         $items = $parents->slice(($page - 1) * $perPage, $perPage)->values();
 
-        // Transformar os dados para incluir campos do user
-        $transformedItems = $items->map(function ($parent) {
+        // Buscar turmas dos alunos diretamente da tabela pivot
+        $allStudentIds = $items->flatMap(function ($parent) {
+            return $parent->students->pluck('id');
+        })->unique()->toArray();
+
+        $driver = DB::connection('shared')->getDriverName();
+        $pivotTable = $driver === 'sqlite' ? 'matriculas_turma' : 'escola.matriculas_turma';
+
+        $matriculas = ! empty($allStudentIds) ? DB::connection('shared')
+            ->table($pivotTable)
+            ->where('tenant_id', $tenant->id)
+            ->where('status', 'ativo')
+            ->whereIn('aluno_id', $allStudentIds)
+            ->get(['aluno_id', 'turma_id']) : collect();
+
+        $turmaIds = $matriculas->pluck('turma_id')->unique()->toArray();
+        $turmasMap = ! empty($turmaIds) ? Turma::query()
+            ->whereIn('id', $turmaIds)
+            ->get(['id', 'nome', 'serie', 'turma_letra', 'ano_letivo'])
+            ->keyBy('id') : collect();
+
+        $matriculasMap = $matriculas->groupBy('aluno_id')->map(function ($items) {
+            return $items->first()->turma_id;
+        });
+
+        // Transformar os dados para incluir campos do user e alunos
+        $transformedItems = $items->map(function ($parent) use ($matriculasMap, $turmasMap) {
             return [
                 'id' => $parent->id,
                 'nome_completo' => $parent->user?->nome_completo ?? null,
@@ -85,6 +116,24 @@ class ParentsController extends Controller
                 'telefone' => $parent->user?->telefone ?? null,
                 'parentesco' => $parent->parentesco ?? null,
                 'ativo' => $parent->user?->ativo ?? false,
+                'students' => $parent->students->map(function ($student) use ($matriculasMap, $turmasMap) {
+                    $turmaId = $matriculasMap->get($student->id);
+                    $turma = $turmaId ? $turmasMap->get($turmaId) : null;
+
+                    return [
+                        'id' => $student->id,
+                        'nome' => $student->nome ?? 'Sem nome',
+                        'nome_social' => $student->nome_social,
+                        'data_nascimento' => optional($student->data_nascimento)->toDateString(),
+                        'turma' => $turma ? [
+                            'id' => $turma->id,
+                            'nome' => $turma->nome,
+                            'serie' => $turma->serie,
+                            'turma_letra' => $turma->turma_letra,
+                            'ano_letivo' => $turma->ano_letivo,
+                        ] : null,
+                    ];
+                })->values(),
             ];
         })->toArray();
 
@@ -181,8 +230,36 @@ class ParentsController extends Controller
 
         $parent->load([
             'user:id,nome_completo,cpf,email,telefone,ativo',
-            'students.user:id,nome_completo,cpf,email,telefone',
+            'students',
         ]);
+
+        // Buscar turmas dos alunos diretamente da tabela pivot
+        $studentIds = $parent->students->pluck('id')->toArray();
+        $driver = DB::connection('shared')->getDriverName();
+        $pivotTable = $driver === 'sqlite' ? 'matriculas_turma' : 'escola.matriculas_turma';
+
+        $matriculas = DB::connection('shared')
+            ->table($pivotTable)
+            ->where('tenant_id', $tenant->id)
+            ->where('status', 'ativo')
+            ->whereIn('aluno_id', $studentIds)
+            ->get(['aluno_id', 'turma_id']);
+
+        $turmaIds = $matriculas->pluck('turma_id')->unique()->toArray();
+        $turmasMap = Turma::query()
+            ->whereIn('id', $turmaIds)
+            ->get(['id', 'nome', 'serie', 'turma_letra', 'ano_letivo'])
+            ->keyBy('id');
+
+        $matriculasMap = $matriculas->groupBy('aluno_id')->map(function ($items) {
+            return $items->first()->turma_id;
+        });
+
+        $turmas = Turma::query()
+            ->where('tenant_id', $tenant->id)
+            ->where('ativo', true)
+            ->orderBy('nome')
+            ->get(['id', 'nome', 'serie', 'turma_letra', 'ano_letivo']);
 
         return Inertia::render('school/parents/Show', [
             'parent' => [
@@ -194,20 +271,28 @@ class ParentsController extends Controller
                 'parentesco' => $parent->parentesco,
                 'profissao' => $parent->profissao,
                 'ativo' => $parent->user?->ativo ?? false,
-                'students' => $parent->students->map(function ($student) {
+                'students' => $parent->students->map(function ($student) use ($matriculasMap, $turmasMap) {
+                    $turmaId = $matriculasMap->get($student->id);
+                    $turma = $turmaId ? $turmasMap->get($turmaId) : null;
+
                     return [
                         'id' => $student->id,
-                        'nome_completo' => $student->user?->nome_completo ?? 'Sem nome',
-                        'cpf' => $student->user?->cpf,
-                        'email' => $student->user?->email,
-                        'telefone' => $student->user?->telefone,
-                        'matricula' => $student->matricula,
-                        'serie' => $student->serie,
-                        'turma' => $student->turma,
+                        'nome' => $student->nome ?? 'Sem nome',
+                        'nome_social' => $student->nome_social,
+                        'foto_url' => $student->foto_url,
+                        'data_nascimento' => optional($student->data_nascimento)->toDateString(),
                         'ativo' => (bool) $student->ativo,
+                        'turma' => $turma ? [
+                            'id' => $turma->id,
+                            'nome' => $turma->nome,
+                            'serie' => $turma->serie,
+                            'turma_letra' => $turma->turma_letra,
+                            'ano_letivo' => $turma->ano_letivo,
+                        ] : null,
                     ];
                 })->values(),
             ],
+            'turmas' => $turmas,
         ]);
     }
 

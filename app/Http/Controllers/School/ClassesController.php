@@ -8,6 +8,7 @@ use App\Http\Requests\School\UpdateClassRequest;
 use App\Models\Turma;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -280,5 +281,53 @@ class ClassesController extends Controller
                 'title' => 'Turma excluída',
                 'message' => 'A turma foi removida com sucesso.',
             ]);
+    }
+
+    /**
+     * Display the students enrolled in the specified class.
+     */
+    public function students(Turma $class): Response
+    {
+        $tenant = $this->getTenant();
+
+        if ($class->tenant_id !== $tenant->id) {
+            abort(404);
+        }
+
+        $driver = DB::connection('shared')->getDriverName();
+        $pivotTable = $driver === 'sqlite' ? 'matriculas_turma' : 'escola.matriculas_turma';
+        $alunosTable = $driver === 'sqlite' ? 'alunos' : 'escola.alunos';
+
+        $students = DB::connection('shared')
+            ->table($pivotTable.' as matriculas')
+            ->join($alunosTable.' as alunos', 'alunos.id', '=', 'matriculas.aluno_id')
+            ->where('matriculas.tenant_id', $tenant->id)
+            ->where('matriculas.turma_id', $class->id)
+            ->where('matriculas.status', 'ativo')
+            ->whereNull('alunos.deleted_at')
+            ->orderBy('alunos.nome')
+            ->select([
+                'alunos.id',
+                'alunos.nome',
+                'alunos.nome_social',
+                'alunos.foto_url',
+                'alunos.data_nascimento',
+                'alunos.ativo',
+                'matriculas.id as matricula_id',
+                'matriculas.data_matricula',
+            ])
+            ->paginate(15)
+            ->withQueryString();
+
+        return Inertia::render('school/classes/Students', [
+            'turma' => [
+                'id' => $class->id,
+                'nome' => $class->nome,
+                'serie' => $class->serie,
+                'turma_letra' => $class->turma_letra,
+                'ano_letivo' => $class->ano_letivo,
+            ],
+            'students' => $students,
+        ]);
     }
 }

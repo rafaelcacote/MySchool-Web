@@ -16,16 +16,28 @@ import { ArrowLeft, Users } from 'lucide-vue-next';
 import { ref } from 'vue';
 import StudentForm from '../students/Partials/StudentForm.vue';
 
+interface Turma {
+    id: string;
+    nome: string;
+    serie?: string | null;
+    turma_letra?: string | null;
+    ano_letivo?: string | null;
+}
+
 interface Student {
     id: string;
-    nome_completo: string;
-    cpf?: string | null;
-    email?: string | null;
-    telefone?: string | null;
-    matricula?: string | null;
-    serie?: string | null;
-    turma?: string | null;
+    nome: string;
+    nome_social?: string | null;
+    foto_url?: string | null;
+    data_nascimento?: string | null;
     ativo: boolean;
+    turma?: {
+        id: string;
+        nome: string;
+        serie?: string | null;
+        turma_letra?: string | null;
+        ano_letivo?: string | null;
+    } | null;
 }
 
 interface Parent {
@@ -42,6 +54,7 @@ interface Parent {
 
 interface Props {
     parent: Parent;
+    turmas?: Turma[];
 }
 
 const props = defineProps<Props>();
@@ -213,6 +226,7 @@ function detachStudent(studentId: string) {
                             v-slot="{ processing, errors }"
                         >
                             <StudentForm
+                                :turmas="props.turmas"
                                 submit-label="Adicionar aluno"
                                 :processing="processing"
                                 :errors="errors"
@@ -230,16 +244,25 @@ function detachStudent(studentId: string) {
                 >
                     <div class="space-y-1">
                         <div class="flex items-center gap-2">
-                            <p class="font-medium">{{ student.nome_completo }}</p>
+                            <p class="font-medium">{{ student.nome }}</p>
                             <Badge :variant="student.ativo ? 'default' : 'destructive'">
                                 {{ student.ativo ? 'Ativo' : 'Inativo' }}
                             </Badge>
                         </div>
-                        <p class="text-sm text-muted-foreground">
-                            Matrícula: {{ student.matricula || '—' }} • Série: {{ student.serie || '—' }} • Turma: {{ student.turma || '—' }}
+                        <p v-if="student.nome_social" class="text-sm text-muted-foreground">
+                            Nome social: {{ student.nome_social }}
                         </p>
-                        <p class="text-xs text-muted-foreground">
-                            CPF: {{ formatCPF(student.cpf) }} • E-mail: {{ student.email || '—' }} • Tel: {{ formatPhone(student.telefone) }}
+                        <p v-if="student.turma" class="text-sm text-muted-foreground">
+                            Turma: {{ student.turma.nome }}
+                            <template v-if="student.turma.serie || student.turma.turma_letra">
+                                ({{ [student.turma.serie, student.turma.turma_letra].filter(Boolean).join(' - ') }})
+                            </template>
+                            <template v-if="student.turma.ano_letivo">
+                                - {{ student.turma.ano_letivo }}
+                            </template>
+                        </p>
+                        <p v-if="student.data_nascimento" class="text-sm text-muted-foreground">
+                            Data de nascimento: {{ new Date(student.data_nascimento).toLocaleDateString('pt-BR') }}
                         </p>
                     </div>
 

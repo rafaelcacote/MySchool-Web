@@ -7,23 +7,28 @@ import { Form, Head, Link } from '@inertiajs/vue3';
 import { ArrowLeft, GraduationCap } from 'lucide-vue-next';
 import StudentForm from './Partials/StudentForm.vue';
 
+interface Turma {
+    id: string;
+    nome: string;
+    serie?: string | null;
+    turma_letra?: string | null;
+    ano_letivo?: string | null;
+}
+
 interface Student {
     id: string;
-    nome_completo: string;
-    cpf?: string | null;
+    nome?: string | null;
+    nome_social?: string | null;
+    foto_url?: string | null;
     data_nascimento?: string | null;
-    data_matricula?: string | null;
-    telefone?: string | null;
-    email?: string | null;
-    matricula?: string | null;
-    serie?: string | null;
-    turma?: string | null;
     ativo: boolean;
     informacoes_medicas?: string | null;
+    turma_id?: string | null;
 }
 
 interface Props {
     student: Student;
+    turmas?: Turma[];
 }
 
 const props = defineProps<Props>();
@@ -42,13 +47,13 @@ const breadcrumbItems: BreadcrumbItem[] = [
 
 <template>
     <AppLayout :breadcrumbs="breadcrumbItems">
-        <Head :title="`Editar aluno: ${props.student.nome_completo}`" />
+        <Head :title="`Editar aluno: ${props.student.nome || 'Aluno'}`" />
 
         <div class="space-y-6">
             <div class="flex items-start justify-between gap-4">
                 <div class="mt-2">
                     <Heading
-                        :title="props.student.nome_completo"
+                        :title="props.student.nome || 'Editar aluno'"
                         description="Atualize os dados do aluno"
                         :icon="GraduationCap"
                     />
@@ -75,6 +80,7 @@ const breadcrumbItems: BreadcrumbItem[] = [
                 >
                     <StudentForm
                         :student="props.student"
+                        :turmas="props.turmas"
                         submit-label="Salvar alterações"
                         :processing="processing"
                         :errors="errors"
