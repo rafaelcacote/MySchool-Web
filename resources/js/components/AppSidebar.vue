@@ -21,7 +21,7 @@ import { index as tenantsIndex } from '@/routes/tenants';
 import { index as usersIndex } from '@/routes/users';
 import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/vue3';
-import { BookOpen, CreditCard, FileSearch, FileText, GraduationCap, KeyRound, LayoutGrid, School, Shield, UserCheck, Users } from 'lucide-vue-next';
+import { BookOpen, CreditCard, FileSearch, FileText, GraduationCap, KeyRound, LayoutGrid, School, Shield, UserCheck, Users, NotebookPen, ClipboardCheck } from 'lucide-vue-next';
 import { computed } from 'vue';
 import AppLogo from './AppLogo.vue';
 
@@ -41,6 +41,34 @@ const isAdminEscola = computed(() => {
     
     // Retorna true apenas se tiver a role E tenants associados
     return hasAdminEscolaRole && hasTenants;
+});
+
+const isProfessor = computed(() => {
+    const user = page.props.auth.user;
+    if (!user) return false;
+    
+    // Verifica se o usuário tem a role "Professor"
+    const roles = (user as any).roles || [];
+    const hasProfessorRole = roles.includes('Professor');
+    
+    // Verifica se o usuário tem pelo menos um tenant associado
+    const tenants = (user as any).tenants || [];
+    const hasTenants = tenants.length > 0;
+    
+    // Retorna true apenas se tiver a role E tenants associados
+    return hasProfessorRole && hasTenants;
+});
+
+const hasExerciciosPermission = computed(() => {
+    const user = page.props.auth.user;
+    if (!user) return false;
+    
+    // Verifica se tem permissão de visualizar exercícios
+    // As permissões podem estar em user.permissions ou precisamos verificar via role
+    const roles = (user as any).roles || [];
+    
+    // Se for Administrador Escola ou Professor, tem acesso
+    return roles.includes('Administrador Escola') || roles.includes('Professor');
 });
 
 const generalNavItems = computed<NavItem[]>(() => {
@@ -114,37 +142,65 @@ const usersAndPermissionsNavItems = computed<NavItem[]>(() => {
 });
 
 const schoolNavItems = computed<NavItem[]>(() => {
-    if (!isAdminEscola.value) {
-        return [];
+    const items: NavItem[] = [];
+    
+    // Se for Administrador Escola, mostra todos os itens
+    if (isAdminEscola.value) {
+        items.push(
+            {
+                title: 'Perfil da Escola',
+                href: '/school/profile',
+                icon: School,
+            },
+            {
+                title: 'Alunos',
+                href: '/school/students',
+                icon: GraduationCap,
+            },
+            {
+                title: 'Responsáveis',
+                href: '/school/parents',
+                icon: Users,
+            },
+            {
+                title: 'Professores',
+                href: '/school/teachers',
+                icon: UserCheck,
+            },
+            {
+                title: 'Turmas',
+                href: '/school/classes',
+                icon: BookOpen,
+            },
+            {
+                title: 'Exercícios',
+                href: '/school/exercises',
+                icon: NotebookPen,
+            },
+            {
+                title: 'Provas',
+                href: '/school/tests',
+                icon: ClipboardCheck,
+            }
+        );
+    } 
+    // Se for Professor, mostra Exercícios e Provas
+    else if (isProfessor.value || hasExerciciosPermission.value) {
+        items.push(
+            {
+                title: 'Exercícios',
+                href: '/school/exercises',
+                icon: NotebookPen,
+            },
+            {
+                title: 'Provas',
+                href: '/school/tests',
+                icon: ClipboardCheck,
+            }
+        );
     }
-
-    return [
-        {
-            title: 'Perfil da Escola',
-            href: '/school/profile',
-            icon: School,
-        },
-        {
-            title: 'Alunos',
-            href: '/school/students',
-            icon: GraduationCap,
-        },
-        {
-            title: 'Responsáveis',
-            href: '/school/parents',
-            icon: Users,
-        },
-        {
-            title: 'Professores',
-            href: '/school/teachers',
-            icon: UserCheck,
-        },
-        {
-            title: 'Turmas',
-            href: '/school/classes',
-            icon: BookOpen,
-        },
-    ];
+    
+    return items;
 });
 
 const footerNavItems: NavItem[] = [];

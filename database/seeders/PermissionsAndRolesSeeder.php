@@ -81,6 +81,26 @@ class PermissionsAndRolesSeeder extends Seeder
             'escola.turmas.criar',
             'escola.turmas.editar',
             'escola.turmas.excluir',
+            'escola.exercicios.visualizar',
+            'escola.exercicios.criar',
+            'escola.exercicios.editar',
+            'escola.exercicios.excluir',
+            'escola.provas.visualizar',
+            'escola.provas.criar',
+            'escola.provas.editar',
+            'escola.provas.excluir',
+        ];
+
+        // Permissões para Professores
+        $professorPermissions = [
+            'escola.exercicios.visualizar',
+            'escola.exercicios.criar',
+            'escola.exercicios.editar',
+            'escola.exercicios.excluir',
+            'escola.provas.visualizar',
+            'escola.provas.criar',
+            'escola.provas.editar',
+            'escola.provas.excluir',
         ];
 
         // Todas as permissões
@@ -107,5 +127,9 @@ class PermissionsAndRolesSeeder extends Seeder
         // Perfil Administrador Escola
         $roleEscola = Role::findOrCreate('Administrador Escola', $guard);
         $roleEscola->syncPermissions($escolaPermissions);
+
+        // Perfil Professor
+        $roleProfessor = Role::findOrCreate('Professor', $guard);
+        $roleProfessor->syncPermissions($professorPermissions);
     }
 }

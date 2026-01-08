@@ -1,11 +1,13 @@
 <?php
 
 use App\Http\Controllers\School\ClassesController;
+use App\Http\Controllers\School\ExercisesController;
 use App\Http\Controllers\School\ParentsController;
 use App\Http\Controllers\School\ParentStudentsController;
 use App\Http\Controllers\School\SchoolProfileController;
 use App\Http\Controllers\School\StudentsController;
 use App\Http\Controllers\School\TeachersController;
+use App\Http\Controllers\School\TestsController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth'])->prefix('school')->name('school.')->group(function () {
@@ -117,4 +119,50 @@ Route::middleware(['auth'])->prefix('school')->name('school.')->group(function (
     Route::delete('classes/{class}', [ClassesController::class, 'destroy'])
         ->middleware('permission:escola.turmas.excluir')
         ->name('classes.destroy');
+
+    // Exercícios
+    Route::get('exercises', [ExercisesController::class, 'index'])
+        ->middleware('permission:escola.exercicios.visualizar')
+        ->name('exercises.index');
+    Route::get('exercises/create', [ExercisesController::class, 'create'])
+        ->middleware('permission:escola.exercicios.criar')
+        ->name('exercises.create');
+    Route::post('exercises', [ExercisesController::class, 'store'])
+        ->middleware('permission:escola.exercicios.criar')
+        ->name('exercises.store');
+    Route::get('exercises/{exercise}', [ExercisesController::class, 'show'])
+        ->middleware('permission:escola.exercicios.visualizar')
+        ->name('exercises.show');
+    Route::get('exercises/{exercise}/edit', [ExercisesController::class, 'edit'])
+        ->middleware('permission:escola.exercicios.editar')
+        ->name('exercises.edit');
+    Route::patch('exercises/{exercise}', [ExercisesController::class, 'update'])
+        ->middleware('permission:escola.exercicios.editar')
+        ->name('exercises.update');
+    Route::delete('exercises/{exercise}', [ExercisesController::class, 'destroy'])
+        ->middleware('permission:escola.exercicios.excluir')
+        ->name('exercises.destroy');
+
+    // Provas
+    Route::get('tests', [TestsController::class, 'index'])
+        ->middleware('permission:escola.provas.visualizar')
+        ->name('tests.index');
+    Route::get('tests/create', [TestsController::class, 'create'])
+        ->middleware('permission:escola.provas.criar')
+        ->name('tests.create');
+    Route::post('tests', [TestsController::class, 'store'])
+        ->middleware('permission:escola.provas.criar')
+        ->name('tests.store');
+    Route::get('tests/{test}', [TestsController::class, 'show'])
+        ->middleware('permission:escola.provas.visualizar')
+        ->name('tests.show');
+    Route::get('tests/{test}/edit', [TestsController::class, 'edit'])
+        ->middleware('permission:escola.provas.editar')
+        ->name('tests.edit');
+    Route::patch('tests/{test}', [TestsController::class, 'update'])
+        ->middleware('permission:escola.provas.editar')
+        ->name('tests.update');
+    Route::delete('tests/{test}', [TestsController::class, 'destroy'])
+        ->middleware('permission:escola.provas.excluir')
+        ->name('tests.destroy');
 });
